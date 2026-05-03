@@ -39,7 +39,7 @@ TOPLEVEL = tb
 
 # List test modules to run, separated by commas and without the .py suffix:
 # Add test_interactive to this list for local runs
-MODULE = test_core,test_ram,test_jump,test_io,test_fibonacci,test_c_code,test_alu_itype,test_alu_rtype,test_utype_lui_auipc,test_load_store_sizes,test_branch_conditions,test_firetest_asm,test_firetest_c,test_game_logic,test_system_instructions
+MODULE = test_core,test_ram,test_jump,test_io,test_fibonacci,test_c_code,test_alu_itype,test_alu_rtype,test_utype_lui_auipc,test_load_store_sizes,test_branch_conditions,test_firetest_asm,test_firetest_c,test_game_logic,test_system_instructions,test_spi_realistic_bin_boot
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim

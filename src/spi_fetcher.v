@@ -22,7 +22,7 @@ module spi_fetcher (
     localparam SHIFT = 2'b01;
     localparam DONE  = 2'b10;
 
-    reg [1:0]  state, next_state;
+    reg [1:0]  state;
     reg [6:0]  bit_counter;         // Counts from 63 down to 0
     reg [63:0] shift_reg;           // Holds the outgoing command+address and incoming data
 
@@ -52,35 +52,55 @@ module spi_fetcher (
 
                         // Load the shift register:
                         // [63:56] = 8-bit Read Command (0x03)
-                        // [55:32] = 24-bit Address (Bottom 24 bits of PC)
+                        // [55:32] = 24-bit byte address (bottom 24 bits of PC)
                         // [31:0]  = 32-bit empty space for the incoming instruction
                         shift_reg   <= {8'h03, pc_addr[23:0], 32'h00000000};
                     end
                 end
 
                 SHIFT: begin
-                    // Output the Most Significant Bit (MSB) to MOSI
-                    spi_mosi        <= shift_reg[63];
+                    // Output the Most Significant Bit (MSB) to MOSI.
+                    spi_mosi  <= shift_reg[63];
 
-                    // Shift left by 1, and sample the incoming MISO bit at the bottom
-                    shift_reg       <= {shift_reg[62:0], spi_miso};
+                    // Shift left by 1, and sample the incoming MISO bit at the bottom.
+                    shift_reg <= {shift_reg[62:0], spi_miso};
 
                     if (bit_counter == 7'd0) begin
-                        state       <= DONE;
+                        state <= DONE;
                     end else begin
                         bit_counter <= bit_counter - 1'b1;
                     end
                 end
 
                 DONE: begin
-                    // The bottom 32 bits of the shift register now hold our instruction
-                    inst_data       <= shift_reg[31:0];
-                    fetch_done      <= 1'b1;
-                    spi_cs_n        <= 1'b1;
-                    state           <= IDLE;
+                    /*
+                     * A real SPI flash returns bytes in increasing byte-address order.
+                     *
+                     * A normal little-endian RISC-V firmware binary stores instruction
+                     * 0x08000093 as bytes:
+                     *
+                     *   address + 0: 0x93
+                     *   address + 1: 0x00
+                     *   address + 2: 0x00
+                     *   address + 3: 0x08
+                     *
+                     * After the serial transfer, shift_reg[31:0] therefore contains
+                     * the returned byte stream as 0x93000008. The CPU decoder expects
+                     * the assembled instruction word 0x08000093, so swap the bytes here.
+                     */
+                    inst_data  <= {
+                        shift_reg[7:0],
+                        shift_reg[15:8],
+                        shift_reg[23:16],
+                        shift_reg[31:24]
+                    };
+
+                    fetch_done <= 1'b1;
+                    spi_cs_n   <= 1'b1;
+                    state      <= IDLE;
                 end
 
-                default: state      <= IDLE;
+                default: state <= IDLE;
             endcase
         end
     end
