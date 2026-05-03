@@ -48,6 +48,17 @@ module core (
     wire [31:0] alu_result;
     wire        zero_flag;
 
+    wire [31:0] timer_value;
+
+    localparam MMIO_OUT_ADDR   = 32'd128;
+    localparam MMIO_IN_ADDR    = 32'd132;
+    localparam MMIO_TIMER_ADDR = 32'd136;
+
+    wire is_mmio_out   = (alu_result == MMIO_OUT_ADDR);
+    wire is_mmio_in    = (alu_result == MMIO_IN_ADDR);
+    wire is_mmio_timer = (alu_result == MMIO_TIMER_ADDR);
+    wire is_mmio       = is_mmio_out || is_mmio_in || is_mmio_timer;
+
     program_counter pc (
         .clk(clk),
         .rst_n(rst_n),
@@ -63,7 +74,6 @@ module core (
 
     wire [31:0] pc_plus_4 = pc_current + 32'd4; // Normal next instruction address
     wire [31:0] pc_branch = pc_current + imm;   // Next instruction address on a jump with a B-type instruction
-
 
     spi_fetcher fetcher (
         .clk(clk),
@@ -147,9 +157,18 @@ module core (
         .read_data(mem_read_data)
     );
 
+    timer timer (
+        .clk(clk),
+        .rst_n(rst_n),
+        .timer_value(timer_value)
+    );
+
     // --- READ ALIGNER (Shift & Sign Extend) ---
-    wire [31:0] raw_read_data = is_mmio_in ? {24'b0, in_port} : mem_read_data;
-    reg  [31:0] aligned_read_data;
+    wire [31:0] raw_read_data = is_mmio_timer ? timer_value :
+                                is_mmio_in    ? {24'b0, in_port} :
+                                                mem_read_data;
+
+    reg [31:0] aligned_read_data;
 
     always @(*) begin
         case (mem_size)
@@ -175,12 +194,6 @@ module core (
     // DATA MEMORY & MMIO
     // ==========================================
 
-    localparam MMIO_OUT_ADDR = 32'd128;
-    localparam MMIO_IN_ADDR  = 32'd132;
-
-    wire is_mmio_out = (alu_result == MMIO_OUT_ADDR);
-    wire is_mmio_in  = (alu_result == MMIO_IN_ADDR);
-
     // --- WRITE ALIGNER (Dynamic Masking) ---
     reg [3:0]  ram_we_mask;
     reg [31:0] ram_write_data;
@@ -189,7 +202,7 @@ module core (
         ram_we_mask = 4'b0000;
         ram_write_data = rs2_data; // Default to full word
 
-        if (mem_we && !is_mmio_out) begin
+        if (mem_we && !is_mmio) begin
             case (mem_size)
                 2'b00: begin // SB (Store Byte)
                     ram_write_data  = {4{rs2_data[7:0]}}; // Replicate byte across all lanes
