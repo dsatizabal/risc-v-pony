@@ -1,0 +1,66 @@
+
+firmware.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <_start>:
+   0:	08000113          	addi	sp,zero,128
+   4:	00000097          	auipc	ra,0x0
+   8:	040080e7          	jalr	ra,64(ra) # 44 <main>
+
+0000000c <_halt>:
+   c:	0000006f          	jal	zero,c <_halt>
+
+00000010 <sum_to>:
+  10:	00050713          	addi	a4,a0,0
+  14:	00000513          	addi	a0,zero,0
+  18:	00070c63          	beq	a4,zero,30 <sum_to+0x20>
+  1c:	00100793          	addi	a5,zero,1
+  20:	00f50533          	add	a0,a0,a5
+  24:	00178793          	addi	a5,a5,1
+  28:	fef77ce3          	bgeu	a4,a5,20 <sum_to+0x10>
+  2c:	00008067          	jalr	zero,0(ra)
+  30:	00008067          	jalr	zero,0(ra)
+
+00000034 <mix_value>:
+  34:	00151793          	slli	a5,a0,0x1
+  38:	00378793          	addi	a5,a5,3
+  3c:	00b78533          	add	a0,a5,a1
+  40:	00008067          	jalr	zero,0(ra)
+
+00000044 <main>:
+  44:	fec10113          	addi	sp,sp,-20
+  48:	00112823          	sw	ra,16(sp)
+  4c:	00812623          	sw	s0,12(sp)
+  50:	0ff00413          	addi	s0,zero,255
+  54:	08802023          	sw	s0,128(zero) # 80 <main+0x3c>
+  58:	01100793          	addi	a5,zero,17
+  5c:	08f02023          	sw	a5,128(zero) # 80 <main+0x3c>
+  60:	08402783          	lw	a5,132(zero) # 84 <main+0x40>
+  64:	08802023          	sw	s0,128(zero) # 80 <main+0x3c>
+  68:	00500513          	addi	a0,zero,5
+  6c:	00178793          	addi	a5,a5,1
+  70:	08f02023          	sw	a5,128(zero) # 80 <main+0x3c>
+  74:	00000097          	auipc	ra,0x0
+  78:	f9c080e7          	jalr	ra,-100(ra) # 10 <sum_to>
+  7c:	08802023          	sw	s0,128(zero) # 80 <main+0x3c>
+  80:	08a02023          	sw	a0,128(zero) # 80 <main+0x3c>
+  84:	00400593          	addi	a1,zero,4
+  88:	00700513          	addi	a0,zero,7
+  8c:	00000097          	auipc	ra,0x0
+  90:	fa8080e7          	jalr	ra,-88(ra) # 34 <mix_value>
+  94:	08802023          	sw	s0,128(zero) # 80 <main+0x3c>
+  98:	08a02023          	sw	a0,128(zero) # 80 <main+0x3c>
+  9c:	03300793          	addi	a5,zero,51
+  a0:	00f12023          	sw	a5,0(sp)
+  a4:	00012783          	lw	a5,0(sp)
+  a8:	00f78793          	addi	a5,a5,15
+  ac:	00f12223          	sw	a5,4(sp)
+  b0:	00412783          	lw	a5,4(sp)
+  b4:	08802023          	sw	s0,128(zero) # 80 <main+0x3c>
+  b8:	08f02023          	sw	a5,128(zero) # 80 <main+0x3c>
+  bc:	08802023          	sw	s0,128(zero) # 80 <main+0x3c>
+  c0:	0aa00793          	addi	a5,zero,170
+  c4:	08f02023          	sw	a5,128(zero) # 80 <main+0x3c>
+  c8:	0000006f          	jal	zero,c8 <main+0x84>

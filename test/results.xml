@@ -1,0 +1,23 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1777769762" />
+    <testcase name="test_simple_addition" classname="test_core" file="/mnt/c/repos/risc-v-pony/test/test_core.py" lineno="10" time="0.1810283660888672" sim_time_ns="6040.001" ratio_time="33364.9423595579" />
+    <testcase name="test_branch_loop" classname="test_core" file="/mnt/c/repos/risc-v-pony/test/test_core.py" lineno="76" time="0.41380810737609863" sim_time_ns="15050.001" ratio_time="36369.51700978027" />
+    <testcase name="test_load_store" classname="test_ram" file="/mnt/c/repos/risc-v-pony/test/test_ram.py" lineno="10" time="0.256685733795166" sim_time_ns="7050.001" ratio_time="27465.496020226303" />
+    <testcase name="test_jal_jalr" classname="test_jump" file="/mnt/c/repos/risc-v-pony/test/test_jump.py" lineno="10" time="0.2443845272064209" sim_time_ns="8050.001" ratio_time="32939.89636750005" />
+    <testcase name="test_mmio" classname="test_io" file="/mnt/c/repos/risc-v-pony/test/test_io.py" lineno="6" time="0.14492201805114746" sim_time_ns="5050.000999999997" ratio_time="34846.3336897344" />
+    <testcase name="test_fibonacci" classname="test_fibonacci" file="/mnt/c/repos/risc-v-pony/test/test_fibonacci.py" lineno="11" time="2.9372003078460693" sim_time_ns="100050.00099999999" ratio_time="34063.05001832491" />
+    <testcase name="test_c_firmware" classname="test_c_code" file="/mnt/c/repos/risc-v-pony/test/test_c_code.py" lineno="6" time="0.28190088272094727" sim_time_ns="10940.001000000018" ratio_time="38807.97000139048" />
+    <testcase name="test_alu_itype" classname="test_alu_itype" file="/mnt/c/repos/risc-v-pony/test/test_alu_itype.py" lineno="10" time="1.1916441917419434" sim_time_ns="45050.00099999999" ratio_time="37804.90964685187" />
+    <testcase name="test_alu_rtype" classname="test_alu_rtype" file="/mnt/c/repos/risc-v-pony/test/test_alu_rtype.py" lineno="10" time="1.2941925525665283" sim_time_ns="50050.00099999999" ratio_time="38672.76233412505" />
+    <testcase name="test_utype_lui_auipc" classname="test_utype_lui_auipc" file="/mnt/c/repos/risc-v-pony/test/test_utype_lui_auipc.py" lineno="151" time="0.8588175773620605" sim_time_ns="35050.00100000002" ratio_time="40811.927845793994" />
+    <testcase name="test_load_store_sizes" classname="test_load_store_sizes" file="/mnt/c/repos/risc-v-pony/test/test_load_store_sizes.py" lineno="163" time="-408.6517059803009" sim_time_ns="60050.00099999999" ratio_time="-146.94665437881397" />
+    <testcase name="test_branch_conditions" classname="test_branch_conditions" file="/mnt/c/repos/risc-v-pony/test/test_branch_conditions.py" lineno="218" time="2.1923775672912598" sim_time_ns="80050.00099999999" ratio_time="36512.871776417545" />
+    <testcase name="test_firetest_asm" classname="test_firetest_asm" file="/mnt/c/repos/risc-v-pony/test/test_firetest_asm.py" lineno="8" time="5.090698480606079" sim_time_ns="200050.00100000005" ratio_time="39297.161629612536" />
+    <testcase name="test_firetest_c" classname="test_firetest_c" file="/mnt/c/repos/risc-v-pony/test/test_firetest_c.py" lineno="8" time="416.90692257881165" sim_time_ns="250050.00099999993" ratio_time="599.7741641066916" />
+    <testcase name="test_game_logic" classname="test_game_logic" file="/mnt/c/repos/risc-v-pony/test/test_game_logic.py" lineno="8" time="-398.495245218277" sim_time_ns="450050.00099999993" ratio_time="-1129.3735782304848" />
+    <testcase name="test_fence_is_nop" classname="test_system_instructions" file="/mnt/c/repos/risc-v-pony/test/test_system_instructions.py" lineno="45" time="0.2713205814361572" sim_time_ns="10050.001000000164" ratio_time="37041.05654942719" />
+    <testcase name="test_ebreak_halts_core" classname="test_system_instructions" file="/mnt/c/repos/risc-v-pony/test/test_system_instructions.py" lineno="76" time="0.3491048812866211" sim_time_ns="20050.00099999993" ratio_time="57432.59998572904" />
+    <testcase name="test_ecall_halts_core" classname="test_system_instructions" file="/mnt/c/repos/risc-v-pony/test/test_system_instructions.py" lineno="107" time="0.3065056800842285" sim_time_ns="20050.00099999993" ratio_time="65414.77793980895" />
+  </testsuite>
+</testsuites>

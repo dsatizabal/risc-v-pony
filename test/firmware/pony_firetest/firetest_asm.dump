@@ -1,0 +1,66 @@
+
+firetest_asm.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <_start>:
+   0:	08000113          	addi	sp,zero,128
+   4:	02100513          	addi	a0,zero,33
+   8:	068000ef          	jal	ra,70 <emit>
+   c:	00500513          	addi	a0,zero,5
+  10:	074000ef          	jal	ra,84 <sum_to>
+  14:	05c000ef          	jal	ra,70 <emit>
+  18:	00700513          	addi	a0,zero,7
+  1c:	00400593          	addi	a1,zero,4
+  20:	084000ef          	jal	ra,a4 <mix_value>
+  24:	04c000ef          	jal	ra,70 <emit>
+  28:	ff810113          	addi	sp,sp,-8
+  2c:	03300293          	addi	t0,zero,51
+  30:	00512023          	sw	t0,0(sp)
+  34:	00012303          	lw	t1,0(sp)
+  38:	00f30313          	addi	t1,t1,15
+  3c:	00612223          	sw	t1,4(sp)
+  40:	00412503          	lw	a0,4(sp)
+  44:	00810113          	addi	sp,sp,8
+  48:	028000ef          	jal	ra,70 <emit>
+  4c:	00300293          	addi	t0,zero,3
+  50:	00900313          	addi	t1,zero,9
+  54:	0062e863          	bltu	t0,t1,64 <branch_pass>
+  58:	0ee00513          	addi	a0,zero,238
+  5c:	014000ef          	jal	ra,70 <emit>
+  60:	00c0006f          	jal	zero,6c <done>
+
+00000064 <branch_pass>:
+  64:	0aa00513          	addi	a0,zero,170
+  68:	008000ef          	jal	ra,70 <emit>
+
+0000006c <done>:
+  6c:	0000006f          	jal	zero,6c <done>
+
+00000070 <emit>:
+  70:	08000293          	addi	t0,zero,128
+  74:	0ff00313          	addi	t1,zero,255
+  78:	0062a023          	sw	t1,0(t0)
+  7c:	00a2a023          	sw	a0,0(t0)
+  80:	00008067          	jalr	zero,0(ra)
+
+00000084 <sum_to>:
+  84:	00000293          	addi	t0,zero,0
+  88:	00100313          	addi	t1,zero,1
+
+0000008c <sum_loop>:
+  8c:	00656863          	bltu	a0,t1,9c <sum_done>
+  90:	006282b3          	add	t0,t0,t1
+  94:	00130313          	addi	t1,t1,1
+  98:	ff5ff06f          	jal	zero,8c <sum_loop>
+
+0000009c <sum_done>:
+  9c:	00028533          	add	a0,t0,zero
+  a0:	00008067          	jalr	zero,0(ra)
+
+000000a4 <mix_value>:
+  a4:	00a502b3          	add	t0,a0,a0
+  a8:	00b282b3          	add	t0,t0,a1
+  ac:	00328513          	addi	a0,t0,3
+  b0:	00008067          	jalr	zero,0(ra)
