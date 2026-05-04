@@ -9,78 +9,21 @@ A simple multi-cycle RiscV RV32E implementation.
 Implement basics instructions like:
 
 - Arithmetic
-- Logics
-- Storage
+- Logic
+- Load/Storage
 - Branching
 
-Supports running C code compiled for RiscV.
+Supports running C code compiled for RV32E (see all supported instructions [here](./docs/supported_instructions.MD)).
 
-- [Read the documentation for project](docs/info.md)
+[Read the documentation for project](docs/info.md)
 
-## Running the local tests
+For an architechtural overview check out [this document](./docs/architectural_overview.MD)
 
-- In the [test](./test/) folder create a Python Virtual Environment as follows:
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-- Install the requirements:
-```bash
-pip install -r requirements.txt
-```
-- Run the tests:
-```bash
-python -m venv .venv
-make
-```
-- Observe that some tests rely on the [firmware](./test/firmware/) folder where two C programs lie: [the counter demo](./test/firmware/counter/) and the [7 segments demo](./test/firmware/7-segments/). The bin file must exist for those tests to run, if those files are not there follow this instructions:
+## Running tests
 
--- Navigate to one of the demo folders and run:
-```bash
-riscv64-unknown-elf-gcc -march=rv32e -mabi=ilp32e -nostartfiles -nostdlib -T link.ld crt0.s main.c -o main.elf -O1
-riscv64-unknown-elf-objcopy -O binary main.elf firmware.bin
-```
---Observe that the following files MUST exists to properly compile the program:
+There's a whole lot of CocoTB tests to be run, some run C/Assembly code, check the full tests list [here](./docs/tests.MD)
 
-crt0.s
-```javascript
-.section .init
-    .global _start
-
-_start:
-    # Set the Stack Pointer (x2) to the very top of our RAM.
-    # We will tell the linker our RAM starts at 0x200, and is 128 bytes long.
-    # So the top of the stack is 0x200 + 128 = 0x280.
-    li sp, 0x280
-
-    # Jump to the C main function
-    jal main
-
-trap:
-    # If main() ever returns, trap the CPU in an infinite loop
-    j trap
-
-```
-
-link.ld
-```javascript
-MEMORY {
-    ROM (rx) : ORIGIN = 0x00000000, LENGTH = 1024   /* 1KB of SPI Flash */
-    RAM (rw) : ORIGIN = 0x00000200, LENGTH = 128    /* 128 Bytes of internal SRAM */
-}
-
-SECTIONS {
-    /* Put the boot code and program instructions in ROM */
-    .text : {
-        *(.init)
-        *(.text*)
-    } > ROM
-
-    /* Put variables in RAM */
-    .data : { *(.data*) *(.rodata*) *(.sdata*) } > RAM AT> ROM
-    .bss  : { *(.bss*) *(.sbss*) } > RAM
-}
-```
+For FPGA testing see the FPGA bringup document [here](./docs/fpga_bringup.MD)
 
 ## What is Tiny Tapeout?
 

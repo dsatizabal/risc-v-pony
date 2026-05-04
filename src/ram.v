@@ -2,7 +2,7 @@
 
 module ram (
     input  wire        clk,
-    input  wire [3:0]  we,         // UPDATED: Now a 4-bit Write Enable Mask!
+    input  wire [3:0]  we,         // A 4-bit Write Enable Mask
     input  wire [31:0] addr,       // Memory Address
     input  wire [31:0] write_data, // Data to save
     output wire [31:0] read_data   // Data loaded
