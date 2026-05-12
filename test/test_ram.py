@@ -3,6 +3,7 @@ import os
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, RisingEdge
 from fake_spi import FakeSPIFlash
+from test_wait_utils import wait_for_captured_count, wait_until_signal_value
 
 # Detect Gate Level simulation mode
 GATES = os.environ.get('GATES', 'no').lower() == 'yes'
@@ -59,10 +60,9 @@ async def test_load_store(dut):
     cocotb.start_soon(monitor_output())
 
     dut._log.info("Executing Load/Store Memory Program...")
-    await ClockCycles(dut.clk, 700)
-
-    assert len(captured) >= 2, \
-        f"Expected 2 MMIO writes to out_port, got {len(captured)}: {captured}"
+    await wait_for_captured_count(
+        dut, captured, 2, max_cycles=30_000, label="load/store MMIO writes"
+    )
     x3_val = captured[0]  # x3 written first (42, loaded from RAM)
     x2_val = captured[1]  # x2 written second (0, cleared)
 

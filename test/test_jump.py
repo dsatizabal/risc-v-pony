@@ -3,6 +3,7 @@ import os
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, RisingEdge
 from fake_spi import FakeSPIFlash
+from test_wait_utils import wait_for_captured_count, wait_until_signal_value
 
 # Detect Gate Level simulation mode
 GATES = os.environ.get('GATES', 'no').lower() == 'yes'
@@ -63,10 +64,9 @@ async def test_jal_jalr(dut):
     cocotb.start_soon(monitor_output())
 
     dut._log.info("Executing Function Call & Return Program...")
-    await ClockCycles(dut.clk, 800)
-
-    assert len(captured) >= 3, \
-        f"Expected 3 MMIO writes to out_port, got {len(captured)}: {captured}"
+    await wait_for_captured_count(
+        dut, captured, 3, max_cycles=30_000, label="JAL/JALR MMIO writes"
+    )
     x1_val = captured[0]  # return address = 4
     x3_val = captured[1]  # subroutine result = 42
     x2_val = captured[2]  # main continuation = 99

@@ -2,6 +2,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 from fake_spi import FakeSPIFlash
+from test_wait_utils import wait_for_captured_count, wait_until_signal_value
 
 @cocotb.test()
 async def test_mmio(dut):
@@ -32,16 +33,19 @@ async def test_mmio(dut):
     await ClockCycles(dut.clk, 5)
     dut.rst_n.value = 1
 
-    # 6. Let the processor run!
-    # 6 instructions * ~65 cycles = ~390 cycles. Wait 500 to be safe.
+    # 6. Let the processor run. The realistic SPI fetcher is slower than
+    # the old fake-SPI path, so wait until the expected MMIO value appears
+    # instead of using a brittle fixed cycle count.
     dut._log.info("Executing Memory-Mapped I/O Program...")
-    await ClockCycles(dut.clk, 500)
+    await wait_until_signal_value(
+        dut, dut.out_port, 42, max_cycles=20_000, label="out_port"
+    )
 
     # 7. Verify the results
     # We fed '41' into the physical pins. The CPU should have added 1 and
     # pushed '42' out to the physical output pins.
     _raw = dut.out_port.value
-    assert 'x' not in _raw.binstr, f"out_port still X after 500 cycles — GL init issue"
+    assert 'x' not in _raw.binstr, f"out_port still X after wait — GL init issue"
     final_out = _raw.integer
 
     dut._log.info(f"Physical Input Port was: 41")
