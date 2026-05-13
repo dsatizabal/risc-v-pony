@@ -50,14 +50,18 @@ module core (
 
     wire [31:0] timer_value;
 
-    localparam MMIO_OUT_ADDR   = 32'd128;
-    localparam MMIO_IN_ADDR    = 32'd132;
-    localparam MMIO_TIMER_ADDR = 32'd136;
+    localparam MMIO_OUT_ADDR        = 32'd128;
+    localparam MMIO_IN_ADDR         = 32'd132;
+    localparam MMIO_TIMER_ADDR      = 32'd136;
+    localparam MMIO_VGA_CTRL        = 32'd140;
+    localparam MMIO_GAMEPAD_DATA    = 32'd144;
 
-    wire is_mmio_out   = (alu_result == MMIO_OUT_ADDR);
-    wire is_mmio_in    = (alu_result == MMIO_IN_ADDR);
-    wire is_mmio_timer = (alu_result == MMIO_TIMER_ADDR);
-    wire is_mmio       = is_mmio_out || is_mmio_in || is_mmio_timer;
+    wire is_mmio_out        = (alu_result == MMIO_OUT_ADDR);
+    wire is_mmio_vga_ctrl   = (alu_result == MMIO_VGA_CTRL);
+    wire is_mmio_in         = (alu_result == MMIO_IN_ADDR);
+    wire is_mmio_gamepad    = (alu_result == MMIO_GAMEPAD_DATA);
+    wire is_mmio_timer      = (alu_result == MMIO_TIMER_ADDR);
+    wire is_mmio            = is_mmio_out || is_mmio_in || is_mmio_timer || is_mmio_vga_ctrl || is_mmio_gamepad;
 
     program_counter pc (
         .clk(clk),
@@ -164,8 +168,9 @@ module core (
     );
 
     // --- READ ALIGNER (Shift & Sign Extend) ---
-    wire [31:0] raw_read_data = is_mmio_timer ? timer_value :
-                                is_mmio_in    ? {24'b0, in_port} :
+    wire [31:0] raw_read_data = is_mmio_timer   ? timer_value :
+                                is_mmio_in      ? {24'b0, in_port} :
+                                is_mmio_gamepad ? {19'b0, gamepad0_state} :
                                                 mem_read_data;
 
     reg [31:0] aligned_read_data;
@@ -221,11 +226,54 @@ module core (
 
     // Physical Output Register
     reg [7:0] out_reg;
-    assign out_port = out_reg;
+    reg [7:0] vga_ctrl_reg;
 
     always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) out_reg <= 8'b0;
-        else if (mem_we && is_mmio_out) out_reg <= rs2_data[7:0];
+        if (!rst_n) begin
+            out_reg             <= 8'b0;
+            vga_ctrl_reg        <= 8'b0;
+        end else if (mem_we && is_mmio_out) begin
+            out_reg             <= rs2_data[7:0];
+        end else if (mem_we && is_mmio_vga_ctrl) begin
+            vga_ctrl_reg        <= rs2_data[7:0];
+        end
     end
+
+    assign out_port = vga_ctrl_reg == 8'd0 ? out_reg : vga_out;
+
+    // VGA Module
+    wire [7:0] vga_out;
+
+    vga_peripheral vga(
+        .clk(clk),
+        .rst_n(rst_n),
+        .enabled(vga_ctrl_reg == 8'd0 ? 1'b0 : 1'b1),
+        .vga_out(vga_out)
+    );
+
+    // Gamepad module
+    // IsPresent_SEL_START_LEFT_RIGHT_DOWN_UP_L_R_Y_X_B_A
+    wire [12:0] gamepad0_state;
+
+    gamepad_pmod_single driver (
+        .rst_n(rst_n),
+        .clk(clk),
+        .pmod_data(in_port[6]),
+        .pmod_clk(in_port[5]),
+        .pmod_latch(in_port[4]),
+        .b(gamepad0_state [1]),
+        .y(gamepad0_state [3]),
+        .select(gamepad0_state [11]),
+        .start(gamepad0_state [10]),
+        .up(gamepad0_state [6]),
+        .down(gamepad0_state[7]),
+        .left(gamepad0_state[9]),
+        .right(gamepad0_state[8]),
+        .a(gamepad0_state[0]),
+        .x(gamepad0_state[2]),
+        .l(gamepad0_state[5]),
+        .r(gamepad0_state[4]),
+        .is_present(gamepad0_state[12])
+    );
 
 endmodule

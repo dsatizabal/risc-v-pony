@@ -21,12 +21,15 @@ project:
     - "control_unit.v"
     - "core.v"
     - "decoder.v"
+    - "gamepad.v"
+    - "h_sync_generator.v"
     - "program_counter.v"
     - "project.v"
     - "ram.v"
     - "reg_file.v"
     - "spi_fetcher.v"
     - "timer.v"
+    - "vga_peripheral.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).

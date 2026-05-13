@@ -1,6 +1,27 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1778618663" />
-    <testcase name="test_interactive_menu" classname="test_interactive" file="/mnt/c/repos/risc-v-pony/test/test_interactive.py" lineno="21" time="8.637678623199463" sim_time_ns="90040.001" ratio_time="10424.097136256789" />
+    <property name="random_seed" value="1778713917" />
+    <testcase name="test_simple_addition" classname="test_core" file="/mnt/c/repos/risc-v-pony/test/test_core.py" lineno="11" time="0.28816699981689453" sim_time_ns="9580.001" ratio_time="33244.61512278391" />
+    <testcase name="test_branch_loop" classname="test_core" file="/mnt/c/repos/risc-v-pony/test/test_core.py" lineno="76" time="0.5436744689941406" sim_time_ns="20470.001" ratio_time="37651.208889525056" />
+    <testcase name="test_load_store" classname="test_ram" file="/mnt/c/repos/risc-v-pony/test/test_ram.py" lineno="11" time="0.28521251678466797" sim_time_ns="10950.000999999997" ratio_time="38392.427946165895" />
+    <testcase name="test_jal_jalr" classname="test_jump" file="/mnt/c/repos/risc-v-pony/test/test_jump.py" lineno="11" time="0.29015398025512695" sim_time_ns="10950.001000000004" ratio_time="37738.586216780044" />
+    <testcase name="test_mmio" classname="test_io" file="/mnt/c/repos/risc-v-pony/test/test_io.py" lineno="7" time="423.7124547958374" sim_time_ns="6860.000999999997" ratio_time="16.1902274109583" />
+    <testcase name="test_fibonacci" classname="test_fibonacci" file="/mnt/c/repos/risc-v-pony/test/test_fibonacci.py" lineno="11" time="-420.8763310909271" sim_time_ns="100050.00099999999" ratio_time="-237.71828826930386" />
+    <testcase name="test_c_firmware" classname="test_c_code" file="/mnt/c/repos/risc-v-pony/test/test_c_code.py" lineno="6" time="0.5883815288543701" sim_time_ns="21820.00100000002" ratio_time="37084.78245822137" />
+    <testcase name="test_alu_itype" classname="test_alu_itype" file="/mnt/c/repos/risc-v-pony/test/test_alu_itype.py" lineno="11" time="1.2115545272827148" sim_time_ns="46310.00099999999" ratio_time="38223.62094082919" />
+    <testcase name="test_alu_rtype" classname="test_alu_rtype" file="/mnt/c/repos/risc-v-pony/test/test_alu_rtype.py" lineno="11" time="1.6555852890014648" sim_time_ns="63990.00100000002" ratio_time="38650.984292445835" />
+    <testcase name="test_utype_lui_auipc" classname="test_utype_lui_auipc" file="/mnt/c/repos/risc-v-pony/test/test_utype_lui_auipc.py" lineno="151" time="0.8725292682647705" sim_time_ns="35050.00099999999" ratio_time="40170.573383406554" />
+    <testcase name="test_load_store_sizes" classname="test_load_store_sizes" file="/mnt/c/repos/risc-v-pony/test/test_load_store_sizes.py" lineno="163" time="1.4763507843017578" sim_time_ns="60050.00099999999" ratio_time="40674.6158423323" />
+    <testcase name="test_branch_conditions" classname="test_branch_conditions" file="/mnt/c/repos/risc-v-pony/test/test_branch_conditions.py" lineno="218" time="2.11574649810791" sim_time_ns="80050.00099999999" ratio_time="37835.34609254363" />
+    <testcase name="test_firetest_asm" classname="test_firetest_asm" file="/mnt/c/repos/risc-v-pony/test/test_firetest_asm.py" lineno="8" time="5.026843309402466" sim_time_ns="200050.00100000005" ratio_time="39796.34706851042" />
+    <testcase name="test_firetest_c" classname="test_firetest_c" file="/mnt/c/repos/risc-v-pony/test/test_firetest_c.py" lineno="8" time="6.453030824661255" sim_time_ns="250050.00099999993" ratio_time="38749.23393274292" />
+    <testcase name="test_game_logic" classname="test_game_logic" file="/mnt/c/repos/risc-v-pony/test/test_game_logic.py" lineno="8" time="12.0078604221344" sim_time_ns="450050.00099999993" ratio_time="37479.61628288176" />
+    <testcase name="test_fence_is_nop" classname="test_system_instructions" file="/mnt/c/repos/risc-v-pony/test/test_system_instructions.py" lineno="45" time="0.26384782791137695" sim_time_ns="10050.001000000164" ratio_time="38090.14112246483" />
+    <testcase name="test_ebreak_halts_core" classname="test_system_instructions" file="/mnt/c/repos/risc-v-pony/test/test_system_instructions.py" lineno="76" time="0.38767027854919434" sim_time_ns="20050.00099999993" ratio_time="51719.211168404385" />
+    <testcase name="test_ecall_halts_core" classname="test_system_instructions" file="/mnt/c/repos/risc-v-pony/test/test_system_instructions.py" lineno="107" time="0.3507721424102783" sim_time_ns="20050.00099999993" ratio_time="57159.61610357467" />
+    <testcase name="test_spi_realistic_bin_boot" classname="test_spi_realistic_bin_boot" file="/mnt/c/repos/risc-v-pony/test/test_spi_realistic_bin_boot.py" lineno="12" time="0.6306281089782715" sim_time_ns="25050.001000000164" ratio_time="39722.303277260464" />
+    <testcase name="test_timer_mmio_increments" classname="test_timer_mmio" file="/mnt/c/repos/risc-v-pony/test/test_timer_mmio.py" lineno="115" time="5.171901702880859" sim_time_ns="200050.00099999993" ratio_time="38680.163021769695" />
+    <testcase name="test_gamepad_mmio_single_buttons_and_combo" classname="test_gamepad_mmio" file="/mnt/c/repos/risc-v-pony/test/test_gamepad_mmio.py" lineno="220" time="5.614448547363281" sim_time_ns="205450.00099999993" ratio_time="36593.08643882498" />
+    <testcase name="test_vga_mode_mux_from_cpu" classname="test_vga_mode" file="/mnt/c/repos/risc-v-pony/test/test_vga_mode.py" lineno="102" time="1.0467350482940674" sim_time_ns="40930.001000000164" ratio_time="39102.541819638565" />
   </testsuite>
 </testsuites>
