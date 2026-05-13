@@ -1,4 +1,4 @@
-# Risc V Pony: General architecture overview
+# Risc V Pony: Supported instructions
  Next the full list of supported instructions by the Risc V Pony CPU
 
  ## Branch instructions

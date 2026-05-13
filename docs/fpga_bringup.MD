@@ -78,7 +78,7 @@ To avoid accumulating a bunch of possible failure factors that make it harder to
 
 We're using [TinyTapeout's QSPI PMOD](https://store.tinytapeout.com/products/QSPI-Pmod-p716541602) that includes a 128 Mbit Flash and 2 64 Mbit RAM chips, both supporting Single/Dual/Quad SPI modes. You can get one of those directly from the [TinyTapeout store](https://store.tinytapeout.com/) or get one from, for example JLCPCB, by getting [the KiCad from the PMODs repo](https://github.com/mole99/qspi-pmod), generating the gerber files and place an order.
 
-So, in the [TangNanoBringUp folder](../src/TrangNanoBringUp/) there are 3 files:
+So, in the [TangNanoBringUp folder](../src/TrangNanoSPITest/) there are 3 files:
 
 - tang_nano_spi_flash_led_demo_top.v: The top module for the SPI PMOD tests
 - spi_flash_led_demo_core.v: Kind of a core that uses the SPI fetcher to read from the SPI memory and show the data in the leds
@@ -156,7 +156,7 @@ The following pins are used for TangNano to drive the PMOD, observe that the sin
 
 We can use a simple module to just send the _9Fh_ command to the Flash memory and expect to read 3-bytes ID that must return _EFh 70h 18h_ for our case
 
-Use the [JEDEC ID Reader](./scripts/jedec_id_reader.v) along with the [Gowin Top Module for the FPGA BringUp](../src/TrangNanoBringUp/tang_nano_spi_flash_led_demo_top.v) to perform this read, put that file inside the project and wire it up as follows:
+Use the [JEDEC ID Reader](./scripts/jedec_id_reader.v) along with the [Gowin Top Module for the FPGA BringUp](../src/TrangNanoSPITest/tang_nano_spi_flash_led_demo_top.v) to perform this read, put that file inside the project and wire it up as follows:
 
 ```verilog
 jedec_id_reader #(
@@ -180,13 +180,13 @@ See that this replaces the core and thus the [SPI fetcher](../src/spi_fetcher.v)
 Build the project and flash the TangNano bitstream, make sure you have the PMOD properly attached to the FPGA and run, you must see a led sequence showing the 6 nibbles of the JEDEC ID read, if you do you have the PMOD working now.
 
 > [!IMPORTANT]  
-> Observe that for the tests we used a seconday clock generated from the 27 MHz clock of the TangNano, during the first tests, to make sure we were not hitting a timing issue we divided the frecuency by 13 to get 1 MHz aproximately, this parameter can be changed in line 51 of the [TangNano bring up Top module](../src/TrangNanoBringUp/tang_nano_spi_flash_led_demo_top.v)
+> Observe that for the tests we used a seconday clock generated from the 27 MHz clock of the TangNano, during the first tests, to make sure we were not hitting a timing issue we divided the frecuency by 13 to get 1 MHz aproximately, this parameter can be changed in line 51 of the [TangNano bring up Top module](../src/TrangNanoSPITest/tang_nano_spi_flash_led_demo_top.v)
 
 ### Moving onto real memory
 
 Now that the Flash's ID's been read properly we can try to read memory locations. At this point it is assume that you have written a sequence BIN file into the Flash starting at 0x00000000, either by performing the previously described procedure or by any other mean.
 
-Remove the [JEDEC ID Reader](./scripts/jedec_id_reader.v) and restore the changes in the [TangNano bring up Top module](../src/TrangNanoBringUp/tang_nano_spi_flash_led_demo_top.v) so it uses the core and the SPI Fetcher.
+Remove the [JEDEC ID Reader](./scripts/jedec_id_reader.v) and restore the changes in the [TangNano bring up Top module](../src/TrangNanoSPITest/tang_nano_spi_flash_led_demo_top.v) so it uses the core and the SPI Fetcher.
 
 You can initially leave a high value for the clock divider used to generate the secondary clock for the core and thus the SPI reader, but it was tested providing the full 27MHz clock and it worked.
 
@@ -194,6 +194,16 @@ Use Gowin to build the bitstream again, make sure you have the PMOD properly con
 
 ## Test of the RiscV Pony in TangNano 20K
 
+Finally the moment came to execure real instructions.
 
+In the folder [FirstFPGATest](../src/FirstFPGATest/) there's a [top.v](../src/FirstFPGATest/top.v) file that constitutes the top module to be used in Gowin along with the rest of the [RTL files](../src/). So create a new Gowing project and add the top.v file and all the verilog files. You can use for this test the [same CST file](../src/TangNanoSPITest/tang_nano_spi_flash_led_demo.cst) as for the led tests.
 
+Flash your SPI ROM with the provided [BIN file](../src/FirstFPGATest/pony_led.bin), that's the compilation of the [assembly code](../src/FirstFPGATest/first.S) using the [linker settings](../src/FirstFPGATest/link.ld), you can compile yourself and tinker with the code, this program must reproduce a similar LEDs sequence of that generated in the LEDs tests.
 
+Build the project and upload the bitstream to TangNano, you must see that beautiful Pony galloping:
+
+<img src="../img/pony.gif" width=500 />
+
+## Next steps:
+
+🚶‍♂️‍➡️Test in silicon
