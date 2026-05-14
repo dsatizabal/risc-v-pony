@@ -57,6 +57,8 @@ TOPLEVEL = tb
 #        .vga_out(vga_out)
 #    );
 
+# The VGA tests (test_vga_primitives) are long running and generate large VCD files, run those at your convenience
+
 # The VGA tests are long running and generate large VCD files, run those at your convenience
 
 # test_vga_rectangle and test_vga_capture are not included for pipeline as those are long running and create very large VCD files, run those at your convenience

@@ -55,13 +55,30 @@ module core (
     localparam MMIO_TIMER_ADDR      = 32'd136;
     localparam MMIO_VGA_CTRL        = 32'd140;
     localparam MMIO_GAMEPAD_DATA    = 32'd144;
+    localparam MMIO_VGA_OBJ_INDEX   = 32'd148;
+    localparam MMIO_VGA_OBJ_WORD0   = 32'd152;
+    localparam MMIO_VGA_OBJ_WORD1   = 32'd156;
+    localparam MMIO_VGA_BG_COLOR    = 32'd160;
 
-    wire is_mmio_out        = (alu_result == MMIO_OUT_ADDR);
-    wire is_mmio_vga_ctrl   = (alu_result == MMIO_VGA_CTRL);
-    wire is_mmio_in         = (alu_result == MMIO_IN_ADDR);
-    wire is_mmio_gamepad    = (alu_result == MMIO_GAMEPAD_DATA);
-    wire is_mmio_timer      = (alu_result == MMIO_TIMER_ADDR);
-    wire is_mmio            = is_mmio_out || is_mmio_in || is_mmio_timer || is_mmio_vga_ctrl || is_mmio_gamepad;
+    wire is_mmio_out           = (alu_result == MMIO_OUT_ADDR);
+    wire is_mmio_vga_ctrl      = (alu_result == MMIO_VGA_CTRL);
+    wire is_mmio_in            = (alu_result == MMIO_IN_ADDR);
+    wire is_mmio_gamepad       = (alu_result == MMIO_GAMEPAD_DATA);
+    wire is_mmio_timer         = (alu_result == MMIO_TIMER_ADDR);
+    wire is_mmio_vga_obj_index = (alu_result == MMIO_VGA_OBJ_INDEX);
+    wire is_mmio_vga_obj_word0 = (alu_result == MMIO_VGA_OBJ_WORD0);
+    wire is_mmio_vga_obj_word1 = (alu_result == MMIO_VGA_OBJ_WORD1);
+    wire is_mmio_vga_bg_color  = (alu_result == MMIO_VGA_BG_COLOR);
+
+    wire is_mmio               = is_mmio_out           ||
+                                 is_mmio_in            ||
+                                 is_mmio_timer         ||
+                                 is_mmio_vga_ctrl      ||
+                                 is_mmio_gamepad       ||
+                                 is_mmio_vga_obj_index ||
+                                 is_mmio_vga_obj_word0 ||
+                                 is_mmio_vga_obj_word1 ||
+                                 is_mmio_vga_bg_color;
 
     program_counter pc (
         .clk(clk),
@@ -168,10 +185,15 @@ module core (
     );
 
     // --- READ ALIGNER (Shift & Sign Extend) ---
-    wire [31:0] raw_read_data = is_mmio_timer   ? timer_value :
-                                is_mmio_in      ? {24'b0, in_port} :
-                                is_mmio_gamepad ? {19'b0, gamepad0_state} :
-                                                mem_read_data;
+    wire [31:0] raw_read_data = is_mmio_timer         ? timer_value :
+                                is_mmio_in            ? {24'b0, in_port} :
+                                is_mmio_gamepad       ? {19'b0, gamepad0_state} :
+                                is_mmio_vga_ctrl      ? {24'b0, vga_ctrl_reg} :
+                                is_mmio_vga_obj_index ? {28'b0, vga_obj_index_reg} :
+                                is_mmio_vga_obj_word0 ? vga_obj_word0_reg :
+                                is_mmio_vga_obj_word1 ? vga_obj_word1_reg :
+                                is_mmio_vga_bg_color  ? {26'b0, vga_bg_color_reg} :
+                                                        mem_read_data;
 
     reg [31:0] aligned_read_data;
 
@@ -224,30 +246,80 @@ module core (
         end
     end
 
-    // Physical Output Register
-    reg [7:0] out_reg;
-    reg [7:0] vga_ctrl_reg;
+    // Physical Output Register and VGA primitive MMIO staging registers.
+    //
+    // MMIO usage:
+    //   128 / 0x80 -> normal GPIO out_reg
+    //   140 / 0x8C -> VGA control; 0 = GPIO mode, nonzero = VGA owns out_port
+    //   148 / 0x94 -> VGA object index [3:0]
+    //   152 / 0x98 -> VGA object WORD0 staging register
+    //   156 / 0x9C -> VGA object WORD1 staging register and commit strobe
+    //   160 / 0xA0 -> VGA background color, RGB222
+    reg [7:0]  out_reg;
+    reg [7:0]  vga_ctrl_reg;
+    reg [3:0]  vga_obj_index_reg;
+    reg [31:0] vga_obj_word0_reg;
+    reg [31:0] vga_obj_word1_reg;
+    reg [5:0]  vga_bg_color_reg;
+
+    wire vga_obj_write = mem_we && is_mmio_vga_obj_word1;
+
+    // When software writes WORD1, commit the object in the same cycle using
+    // rs2_data directly. This avoids the peripheral sampling the previous
+    // vga_obj_word1_reg value on the same clock edge.
+    wire [31:0] vga_obj_word1_to_peripheral = vga_obj_write ? rs2_data : vga_obj_word1_reg;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             out_reg             <= 8'b0;
             vga_ctrl_reg        <= 8'b0;
-        end else if (mem_we && is_mmio_out) begin
-            out_reg             <= rs2_data[7:0];
-        end else if (mem_we && is_mmio_vga_ctrl) begin
-            vga_ctrl_reg        <= rs2_data[7:0];
+            vga_obj_index_reg   <= 4'b0;
+            vga_obj_word0_reg   <= 32'b0;
+            vga_obj_word1_reg   <= 32'b0;
+            vga_bg_color_reg    <= 6'b00_00_00;
+        end else begin
+            if (mem_we && is_mmio_out) begin
+                out_reg <= rs2_data[7:0];
+            end
+
+            if (mem_we && is_mmio_vga_ctrl) begin
+                vga_ctrl_reg <= rs2_data[7:0];
+            end
+
+            if (mem_we && is_mmio_vga_obj_index) begin
+                vga_obj_index_reg <= rs2_data[3:0];
+            end
+
+            if (mem_we && is_mmio_vga_obj_word0) begin
+                vga_obj_word0_reg <= rs2_data;
+            end
+
+            if (vga_obj_write) begin
+                vga_obj_word1_reg <= rs2_data;
+            end
+
+            if (mem_we && is_mmio_vga_bg_color) begin
+                vga_bg_color_reg <= rs2_data[5:0];
+            end
         end
     end
 
-    assign out_port = vga_ctrl_reg == 8'd0 ? out_reg : vga_out;
+    assign out_port = (vga_ctrl_reg == 8'd0) ? out_reg : vga_out;
 
     // VGA Module
     wire [7:0] vga_out;
+    wire       vga_obj_write_ack;
 
     vga_peripheral vga(
         .clk(clk),
         .rst_n(rst_n),
-        .enabled(vga_ctrl_reg == 8'd0 ? 1'b0 : 1'b1),
+        .enabled(vga_ctrl_reg != 8'd0),
+        .bg_color(vga_bg_color_reg),
+        .obj_index(vga_obj_index_reg),
+        .obj_word0(vga_obj_word0_reg),
+        .obj_word1(vga_obj_word1_to_peripheral),
+        .obj_write(vga_obj_write),
+        .obj_write_ack(vga_obj_write_ack),
         .vga_out(vga_out)
     );
 
