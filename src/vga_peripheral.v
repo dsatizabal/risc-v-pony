@@ -45,7 +45,7 @@
 `default_nettype none
 
 module vga_peripheral #(
-    parameter integer NUM_OBJECTS = 12
+    parameter integer NUM_OBJECTS = 10
 ) (
     input  wire        clk,
     input  wire        rst_n,
