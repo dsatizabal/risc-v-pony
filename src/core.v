@@ -50,25 +50,27 @@ module core (
 
     wire [31:0] timer_value;
 
-    localparam MMIO_OUT_ADDR        = 32'd128;
-    localparam MMIO_IN_ADDR         = 32'd132;
-    localparam MMIO_TIMER_ADDR      = 32'd136;
-    localparam MMIO_VGA_CTRL        = 32'd140;
-    localparam MMIO_GAMEPAD_DATA    = 32'd144;
-    localparam MMIO_VGA_OBJ_INDEX   = 32'd148;
-    localparam MMIO_VGA_OBJ_WORD0   = 32'd152;
-    localparam MMIO_VGA_OBJ_WORD1   = 32'd156;
-    localparam MMIO_VGA_BG_COLOR    = 32'd160;
+    localparam MMIO_OUT_ADDR            = 32'd128;
+    localparam MMIO_IN_ADDR             = 32'd132;
+    localparam MMIO_TIMER_ADDR          = 32'd136;
+    localparam MMIO_VGA_CTRL            = 32'd140;
+    localparam MMIO_GAMEPAD_DATA        = 32'd144;
+    localparam MMIO_VGA_OBJ_INDEX       = 32'd148;
+    localparam MMIO_VGA_OBJ_WORD0       = 32'd152;
+    localparam MMIO_VGA_OBJ_WORD1       = 32'd156;
+    localparam MMIO_VGA_BG_COLOR        = 32'd160;
+    localparam MMIO_VGA_FRAMES_COUNTER  = 32'd160;
 
-    wire is_mmio_out           = (alu_result == MMIO_OUT_ADDR);
-    wire is_mmio_vga_ctrl      = (alu_result == MMIO_VGA_CTRL);
-    wire is_mmio_in            = (alu_result == MMIO_IN_ADDR);
-    wire is_mmio_gamepad       = (alu_result == MMIO_GAMEPAD_DATA);
-    wire is_mmio_timer         = (alu_result == MMIO_TIMER_ADDR);
-    wire is_mmio_vga_obj_index = (alu_result == MMIO_VGA_OBJ_INDEX);
-    wire is_mmio_vga_obj_word0 = (alu_result == MMIO_VGA_OBJ_WORD0);
-    wire is_mmio_vga_obj_word1 = (alu_result == MMIO_VGA_OBJ_WORD1);
-    wire is_mmio_vga_bg_color  = (alu_result == MMIO_VGA_BG_COLOR);
+    wire is_mmio_out                = (alu_result == MMIO_OUT_ADDR);
+    wire is_mmio_vga_ctrl           = (alu_result == MMIO_VGA_CTRL);
+    wire is_mmio_in                 = (alu_result == MMIO_IN_ADDR);
+    wire is_mmio_gamepad            = (alu_result == MMIO_GAMEPAD_DATA);
+    wire is_mmio_timer              = (alu_result == MMIO_TIMER_ADDR);
+    wire is_mmio_vga_obj_index      = (alu_result == MMIO_VGA_OBJ_INDEX);
+    wire is_mmio_vga_obj_word0      = (alu_result == MMIO_VGA_OBJ_WORD0);
+    wire is_mmio_vga_obj_word1      = (alu_result == MMIO_VGA_OBJ_WORD1);
+    wire is_mmio_vga_bg_color       = (alu_result == MMIO_VGA_BG_COLOR);
+    wire is_mmio_vga_frames_counter = (alu_result == MMIO_VGA_BG_COLOR);
 
     wire is_mmio               = is_mmio_out           ||
                                  is_mmio_in            ||
@@ -78,7 +80,8 @@ module core (
                                  is_mmio_vga_obj_index ||
                                  is_mmio_vga_obj_word0 ||
                                  is_mmio_vga_obj_word1 ||
-                                 is_mmio_vga_bg_color;
+                                 is_mmio_vga_bg_color  ||
+                                 is_mmio_vga_frames_counter;
 
     program_counter pc (
         .clk(clk),
@@ -185,15 +188,16 @@ module core (
     );
 
     // --- READ ALIGNER (Shift & Sign Extend) ---
-    wire [31:0] raw_read_data = is_mmio_timer         ? timer_value :
-                                is_mmio_in            ? {24'b0, in_port} :
-                                is_mmio_gamepad       ? {19'b0, gamepad0_state} :
-                                is_mmio_vga_ctrl      ? {24'b0, vga_ctrl_reg} :
-                                is_mmio_vga_obj_index ? {28'b0, vga_obj_index_reg} :
-                                is_mmio_vga_obj_word0 ? vga_obj_word0_reg :
-                                is_mmio_vga_obj_word1 ? vga_obj_word1_reg :
-                                is_mmio_vga_bg_color  ? {26'b0, vga_bg_color_reg} :
-                                                        mem_read_data;
+    wire [31:0] raw_read_data = is_mmio_timer               ? timer_value :
+                                is_mmio_in                  ? {24'b0, in_port} :
+                                is_mmio_gamepad             ? {19'b0, gamepad0_state} :
+                                is_mmio_vga_ctrl            ? {24'b0, vga_ctrl_reg} :
+                                is_mmio_vga_obj_index       ? {28'b0, vga_obj_index_reg} :
+                                is_mmio_vga_obj_word0       ? vga_obj_word0_reg :
+                                is_mmio_vga_obj_word1       ? vga_obj_word1_reg :
+                                is_mmio_vga_bg_color        ? {26'b0, vga_bg_color_reg} :
+                                is_mmio_vga_frames_counter  ? {24'b0, vga_frames_counter} :
+                                                            mem_read_data;
 
     reg [31:0] aligned_read_data;
 
@@ -308,6 +312,7 @@ module core (
 
     // VGA Module
     wire [7:0] vga_out;
+    wire [7:0] vga_frames_counter;
     wire       vga_obj_write_ack;
 
     vga_peripheral vga(
@@ -320,6 +325,7 @@ module core (
         .obj_word1(vga_obj_word1_to_peripheral),
         .obj_write(vga_obj_write),
         .obj_write_ack(vga_obj_write_ack),
+        .frames_counter(vga_frames_counter),
         .vga_out(vga_out)
     );
 

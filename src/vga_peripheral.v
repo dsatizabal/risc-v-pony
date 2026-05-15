@@ -45,7 +45,7 @@
 `default_nettype none
 
 module vga_peripheral #(
-    parameter integer NUM_OBJECTS = 10
+    parameter integer NUM_OBJECTS = 8
 ) (
     input  wire        clk,
     input  wire        rst_n,
@@ -59,6 +59,7 @@ module vga_peripheral #(
     input  wire        obj_write,
     output reg         obj_write_ack,
 
+    output reg  [7:0]  frames_counter,
     output wire [7:0]  vga_out
 );
 
@@ -374,6 +375,14 @@ module vga_peripheral #(
                 green <= render_color[3:2];
                 blue  <= render_color[1:0];
             end
+        end
+    end
+
+    always @(negedge vsync or negedge rst_n) begin
+        if (!rst_n) begin
+            frames_counter <= 8'd0;
+        end else begin
+            frames_counter <= frames_counter + 8'd1;
         end
     end
 
