@@ -1,106 +1,159 @@
 `default_nettype none
 
-module spi_fetcher (
-    input  wire        clk,         // System clock
-    input  wire        rst_n,       // Active-low reset
-    input  wire        fetch_req,   // Control unit request
-    input  wire [31:0] pc_addr,     // The 32-bit Program Counter address
+module spi_fetcher #(
+    parameter [7:0] CS_SETUP_CYCLES = 8'd1,
+    parameter [7:0] CS_HOLD_CYCLES  = 8'd1
+) (
+    input  wire        clk,
+    input  wire        rst_n,
 
-    // Physical SPI Pins going to the outside world
-    output reg         spi_cs_n,    // Chip Select (Active Low)
-    output wire        spi_sck,     // Serial Clock
-    output reg         spi_mosi,    // Master Out, Slave In
-    input  wire        spi_miso,    // Master In, Slave Out
+    input  wire        fetch_req,
+    input  wire [31:0] pc_addr,
 
-    // Data returning to the processor
-    output reg  [31:0] inst_data,   // The assembled 32-bit instruction
-    output reg         fetch_done   // Read cycle terminated
+    output reg         spi_cs_n,
+    output reg         spi_sck,
+    output reg         spi_mosi,
+    input  wire        spi_miso,
+
+    output reg  [31:0] inst_data,
+    output reg         fetch_done
 );
 
-    // State machine definitions
-    localparam IDLE  = 2'b00;
-    localparam SHIFT = 2'b01;
-    localparam DONE  = 2'b10;
+    localparam [3:0]
+        STATE_IDLE       = 4'd0,
+        STATE_CS_SETUP   = 4'd1,
+        STATE_LOW_PHASE  = 4'd2,
+        STATE_HIGH_PHASE = 4'd3,
+        STATE_CS_HOLD    = 4'd4,
+        STATE_DONE       = 4'd5;
 
-    reg [1:0]  state;
-    reg [6:0]  bit_counter;         // Counts from 63 down to 0
-    reg [63:0] shift_reg;           // Holds the outgoing command+address and incoming data
+    reg [3:0]  state;
+    reg [7:0]  delay_counter;
 
-    // Continuous assignment for the SPI Clock.
-    // We only toggle the SPI clock when we are actively shifting data.
-    assign spi_sck = (state == SHIFT) ? clk : 1'b0;
+    reg [5:0]  bit_counter;
+    reg [63:0] tx_shift;
+    reg [31:0] rx_shift;
+
+    wire [31:0] rx_shift_next;
+    assign rx_shift_next = {rx_shift[30:0], spi_miso};
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state       <= IDLE;
-            bit_counter <= 7'd0;
-            shift_reg   <= 64'd0;
-            spi_cs_n    <= 1'b1;
-            inst_data   <= 32'd0;
-            fetch_done  <= 1'b0;
-            spi_mosi    <= 1'b0;
+            state         <= STATE_IDLE;
+            delay_counter <= 8'd0;
+            bit_counter   <= 6'd0;
+
+            tx_shift      <= 64'd0;
+            rx_shift      <= 32'd0;
+
+            spi_cs_n      <= 1'b1;
+            spi_sck       <= 1'b0;
+            spi_mosi      <= 1'b0;
+
+            inst_data     <= 32'd0;
+            fetch_done    <= 1'b0;
         end else begin
             case (state)
-                IDLE: begin
-                    fetch_done <= 1'b0;
-                    spi_cs_n   <= 1'b1;
+
+                STATE_IDLE: begin
+                    spi_cs_n      <= 1'b1;
+                    spi_sck       <= 1'b0;
+                    spi_mosi      <= 1'b0;
+                    fetch_done    <= 1'b0;
+                    delay_counter <= 8'd0;
 
                     if (fetch_req) begin
-                        state       <= SHIFT;
+                        tx_shift    <= {8'h03, pc_addr[23:0], 32'h00000000};
+                        rx_shift    <= 32'd0;
+                        bit_counter <= 6'd63;
+
                         spi_cs_n    <= 1'b0;
-                        bit_counter <= 7'd63; // 64 total bits to transfer
+                        spi_sck     <= 1'b0;
+                        spi_mosi    <= 1'b0;
 
-                        // Load the shift register:
-                        // [63:56] = 8-bit Read Command (0x03)
-                        // [55:32] = 24-bit byte address (bottom 24 bits of PC)
-                        // [31:0]  = 32-bit empty space for the incoming instruction
-                        shift_reg   <= {8'h03, pc_addr[23:0], 32'h00000000};
+                        state       <= STATE_CS_SETUP;
                     end
                 end
 
-                SHIFT: begin
-                    // Output the Most Significant Bit (MSB) to MOSI.
-                    spi_mosi  <= shift_reg[63];
+                /*
+                 * Give the Flash a clean CS-low setup time before the
+                 * first clock edge.
+                 */
+                STATE_CS_SETUP: begin
+                    spi_cs_n <= 1'b0;
+                    spi_sck  <= 1'b0;
+                    spi_mosi <= 1'b0;
 
-                    // Shift left by 1, and sample the incoming MISO bit at the bottom.
-                    shift_reg <= {shift_reg[62:0], spi_miso};
-
-                    if (bit_counter == 7'd0) begin
-                        state <= DONE;
+                    if (delay_counter >= CS_SETUP_CYCLES) begin
+                        delay_counter <= 8'd0;
+                        state         <= STATE_LOW_PHASE;
                     end else begin
-                        bit_counter <= bit_counter - 1'b1;
+                        delay_counter <= delay_counter + 8'd1;
                     end
                 end
 
-                DONE: begin
-                    /*
-                     * A real SPI flash returns bytes in increasing byte-address order.
-                     *
-                     * A normal little-endian RISC-V firmware binary stores instruction
-                     * 0x08000093 as bytes:
-                     *
-                     *   address + 0: 0x93
-                     *   address + 1: 0x00
-                     *   address + 2: 0x00
-                     *   address + 3: 0x08
-                     *
-                     * After the serial transfer, shift_reg[31:0] therefore contains
-                     * the returned byte stream as 0x93000008. The CPU decoder expects
-                     * the assembled instruction word 0x08000093, so swap the bytes here.
-                     */
-                    inst_data  <= {
-                        shift_reg[7:0],
-                        shift_reg[15:8],
-                        shift_reg[23:16],
-                        shift_reg[31:24]
+                STATE_LOW_PHASE: begin
+                    spi_cs_n <= 1'b0;
+                    spi_sck  <= 1'b0;
+                    spi_mosi <= tx_shift[63];
+
+                    state    <= STATE_HIGH_PHASE;
+                end
+
+                STATE_HIGH_PHASE: begin
+                    spi_cs_n <= 1'b0;
+                    spi_sck  <= 1'b1;
+                    spi_mosi <= tx_shift[63];
+
+                    tx_shift <= {tx_shift[62:0], 1'b0};
+
+                    if (bit_counter <= 6'd31) begin
+                        rx_shift <= rx_shift_next;
+                    end
+
+                    if (bit_counter == 6'd0) begin
+                        delay_counter <= 8'd0;
+                        state         <= STATE_CS_HOLD;
+                    end else begin
+                        bit_counter <= bit_counter - 6'd1;
+                        state       <= STATE_LOW_PHASE;
+                    end
+                end
+
+                STATE_CS_HOLD: begin
+                    spi_sck  <= 1'b0;
+                    spi_mosi <= 1'b0;
+
+                    if (delay_counter >= CS_HOLD_CYCLES) begin
+                        delay_counter <= 8'd0;
+                        spi_cs_n      <= 1'b1;
+                        state         <= STATE_DONE;
+                    end else begin
+                        spi_cs_n      <= 1'b0;
+                        delay_counter <= delay_counter + 8'd1;
+                    end
+                end
+
+                STATE_DONE: begin
+                    spi_cs_n   <= 1'b1;
+                    spi_sck    <= 1'b0;
+                    spi_mosi   <= 1'b0;
+
+                    inst_data <= {
+                        rx_shift[7:0],
+                        rx_shift[15:8],
+                        rx_shift[23:16],
+                        rx_shift[31:24]
                     };
 
                     fetch_done <= 1'b1;
-                    spi_cs_n   <= 1'b1;
-                    state      <= IDLE;
+                    state      <= STATE_IDLE;
                 end
 
-                default: state <= IDLE;
+                default: begin
+                    state <= STATE_IDLE;
+                end
+
             endcase
         end
     end

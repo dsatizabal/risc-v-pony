@@ -2,6 +2,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, RisingEdge
 from fake_spi import FakeSPIFlash
+from test_wait_utils import wait_for_captured_count, wait_until_signal_value
 
 # Sentinel value written to out_port before each ALU result so repeated
 # or zero values still produce a detectable edge on the output port.
@@ -163,7 +164,11 @@ async def test_alu_rtype(dut):
     cocotb.start_soon(monitor_mmio())
 
     dut._log.info("Executing R-type ALU coverage program...")
-    await ClockCycles(dut.clk, 5000)
+    await wait_for_captured_count(
+        dut, captured_sequence, len(expected_sequence),
+        max_cycles=80_000,
+        label="R-type ALU result writes"
+    )
 
     dut._log.info(f"Captured R-type ALU sequence: {captured_sequence}")
 

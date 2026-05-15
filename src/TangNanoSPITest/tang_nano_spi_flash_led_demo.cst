@@ -1,0 +1,70 @@
+// Tang Nano 20K SPI Flash LED Demo constraints
+//
+// The LED and clock pins match the working Tang Nano LED/Pony demos.
+//
+// IMPORTANT:
+// Replace the FLASH/QSPI pin numbers below with the actual Tang Nano header
+// pins you wire to the QSPI Pmod on your breadboard.
+//
+// QSPI Pmod mapping:
+//   PMOD1 -> flash_cs_n    -> Flash /CS
+//   PMOD2 -> flash_mosi    -> Flash SD0 / DI / IO0
+//   PMOD3 -> flash_miso    -> Flash SD1 / DO / IO1
+//   PMOD4 -> flash_sck     -> Flash SCK
+//   PMOD5 -> flash_wp_n    -> Flash SD2 / WP# / IO2, driven high
+//   PMOD6 -> flash_hold_n  -> Flash SD3 / HOLD# / IO3, driven high
+//   PMOD7 -> ram_a_cs_n    -> RAM A /CS, driven high
+//   PMOD8 -> ram_b_cs_n    -> RAM B /CS, driven high
+
+IO_LOC "clk" 4;
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+
+IO_LOC "rst_n" 88;
+IO_PORT "rst_n" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+
+IO_LOC "led[0]" 15;
+IO_PORT "led[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "led[1]" 16;
+IO_PORT "led[1]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "led[2]" 17;
+IO_PORT "led[2]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "led[3]" 18;
+IO_PORT "led[3]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "led[4]" 19;
+IO_PORT "led[4]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "led[5]" 20;
+IO_PORT "led[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+
+// ---------------------------------------------------------------------------
+// TODO: SET THESE TO YOUR WIRED TANG NANO HEADER PINS
+// ---------------------------------------------------------------------------
+
+IO_LOC "flash_cs_n" 27;
+IO_PORT "flash_cs_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "flash_mosi" 28;
+IO_PORT "flash_mosi" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "flash_miso" 25;
+IO_PORT "flash_miso" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+
+IO_LOC "flash_sck" 26;
+IO_PORT "flash_sck" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "flash_wp_n" 29;
+IO_PORT "flash_wp_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "flash_hold_n" 30;
+IO_PORT "flash_hold_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "ram_a_cs_n" 31;
+IO_PORT "ram_a_cs_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+
+IO_LOC "ram_b_cs_n" 41;
+IO_PORT "ram_b_cs_n" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
