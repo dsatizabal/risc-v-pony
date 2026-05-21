@@ -14,10 +14,9 @@ module vga_peripheral (
     input  wire [31:0] write_data,
 
     output reg  [7:0]  frames_counter,
-    output wire [9:0]  current_line,   // <--- NEW: Exposes the logical line to the CPU
+    output wire [9:0]  current_line,
     output wire [7:0]  vga_out
 );
-
     // Sync Generator Wires
     wire hsync, vsync, display_on;
     wire [9:0] hpos;
@@ -33,37 +32,43 @@ module vga_peripheral (
         .vpos(vpos)
     );
 
-    // Output the LOGICAL line (Pixel doubled Y) for the CPU to read
+    // Output the LOGICAL line
     assign current_line = {1'b0, vpos[9:1]};
 
-    // Memory Arrays (6 Sprites + 8 Rectangles = 14 objects max)
-    reg [31:0] mem_w0 [0:13];
-    reg [31:0] mem_w1 [0:13];
-    reg [31:0] mem_w2 [0:5];  // 6 sprites need Word 2
+    // -----------------------------------------------------
+    // MEMORY ARRAYS (Now fully utilizing 0-15)
+    // 0-5: Sprites
+    // 6-13: Rectangles
+    // 14-15: Diagonal Lines
+    // -----------------------------------------------------
+    reg [31:0] mem_w0 [0:15];
+    reg [31:0] mem_w1 [0:15];
+    reg [31:0] mem_w2 [0:5];  
 
-    // Memory Write Port
     always @(posedge clk) begin
-        if (we_w0 && obj_index < 14) mem_w0[obj_index] <= write_data;
-        if (we_w1 && obj_index < 14) mem_w1[obj_index] <= write_data;
-        if (we_w2 && obj_index < 6)  mem_w2[obj_index] <= write_data;
+        // obj_index is 4 bits, so it naturally limits to 0-15
+        if (we_w0) mem_w0[obj_index] <= write_data;
+        if (we_w1) mem_w1[obj_index] <= write_data;
+        if (we_w2 && obj_index < 6) mem_w2[obj_index] <= write_data;
     end
 
     // -----------------------------------------------------
     // ACTIVE ENGINES (Render Phase)
     // -----------------------------------------------------
-
-    // 6 Sprite Engines
     reg        sp_active    [0:5];
     reg [9:0]  sp_x_count   [0:5];
     reg [7:0]  sp_shift     [0:5];
     reg [2:0]  sp_bits_left [0:5];
     reg [5:0]  sp_color     [0:5];
 
-    // 8 Rectangle Engines
     reg        rect_active  [0:7];
     reg [9:0]  rect_x_count [0:7];
     reg [9:0]  rect_w_count [0:7];
     reg [5:0]  rect_color   [0:7];
+
+    reg        line_active  [0:1];
+    reg [9:0]  line_x_count [0:1];
+    reg [5:0]  line_color   [0:1];
 
     // -----------------------------------------------------
     // HBLANK SCANNER (Evaluation Phase)
@@ -72,10 +77,7 @@ module vga_peripheral (
     reg       is_scanning;
 
     wire [9:0] next_vpos = (vpos == 524) ? 10'd0 : (vpos + 10'd1);
-
-    // PIXEL DOUBLING (Y-AXIS)
     wire [9:0] logical_next_vpos = {1'b0, next_vpos[9:1]};
-
     wire [2:0] dy = logical_next_vpos[2:0] - mem_w0[scan_idx][7:5];
     reg  [7:0] extracted_row;
 
@@ -99,6 +101,7 @@ module vga_peripheral (
             is_scanning <= 1'b0;
             for(i=0; i<6; i=i+1) sp_active[i] <= 1'b0;
             for(i=0; i<8; i=i+1) rect_active[i] <= 1'b0;
+            for(i=0; i<2; i=i+1) line_active[i] <= 1'b0;
         end else begin
 
             if (hpos == 10'd640) begin
@@ -106,10 +109,11 @@ module vga_peripheral (
                 scan_idx    <= 4'd0;
                 for(i=0; i<6; i=i+1) sp_active[i] <= 1'b0;
                 for(i=0; i<8; i=i+1) rect_active[i] <= 1'b0;
+                for(i=0; i<2; i=i+1) line_active[i] <= 1'b0;
             end
 
             else if (is_scanning) begin
-                // --- Evaluate Sprites (Indices 0 to 5) ---
+                // --- Sprites (0 to 5) ---
                 if (scan_idx < 6) begin
                     if (mem_w0[scan_idx][31] &&
                        (logical_next_vpos >= mem_w0[scan_idx][14:5]) &&
@@ -122,8 +126,8 @@ module vga_peripheral (
                         sp_shift[scan_idx]     <= extracted_row;
                     end
                 end
-                // --- Evaluate Rectangles (Indices 6 to 13) ---
-                else begin
+                // --- Rectangles (6 to 13) ---
+                else if (scan_idx < 14) begin
                     if (mem_w0[scan_idx][31] &&
                        (logical_next_vpos >= mem_w0[scan_idx][14:5]) &&
                        (logical_next_vpos <  mem_w0[scan_idx][14:5] + {1'b0, mem_w1[scan_idx][21:13]})) begin
@@ -134,21 +138,34 @@ module vga_peripheral (
                         rect_color[scan_idx - 6]   <= mem_w1[scan_idx][12:7];
                     end
                 end
+                // --- Diagonal Lines (14 to 15) ---
+                else begin
+                    if (mem_w0[scan_idx][31] &&
+                       (logical_next_vpos >= mem_w0[scan_idx][14:5]) &&
+                       (logical_next_vpos <  mem_w0[scan_idx][14:5] + {1'b0, mem_w1[scan_idx][31:22]})) begin
 
-                // Loop control (14 total objects, so finish on index 13)
+                        line_active[scan_idx - 14] <= 1'b1;
+                        line_color[scan_idx - 14]  <= mem_w1[scan_idx][12:7];
+                        
+                        // Calculate X offset based on slope direction
+                        if (mem_w1[scan_idx][21] == 1'b0) // Right (\)
+                            line_x_count[scan_idx - 14] <= mem_w0[scan_idx][24:15] + (logical_next_vpos - mem_w0[scan_idx][14:5]);
+                        else                              // Left (/)
+                            line_x_count[scan_idx - 14] <= mem_w0[scan_idx][24:15] - (logical_next_vpos - mem_w0[scan_idx][14:5]);
+                    end
+                end
+
                 scan_idx <= scan_idx + 1'b1;
-                if (scan_idx == 4'd13) is_scanning <= 1'b0;
+                if (scan_idx == 4'd15) is_scanning <= 1'b0;
             end
 
             // --- Active Rendering ---
             else if (display_on) begin
-                // PIXEL DOUBLING (X-AXIS)
                 if (~hpos[0]) begin
                     for(i=0; i<6; i=i+1) begin
                         if (sp_active[i]) begin
-                            if (sp_x_count[i] > 0) begin
-                                sp_x_count[i] <= sp_x_count[i] - 1'b1;
-                            end else begin
+                            if (sp_x_count[i] > 0) sp_x_count[i] <= sp_x_count[i] - 1'b1;
+                            else begin
                                 sp_shift[i] <= {sp_shift[i][6:0], 1'b0};
                                 if (sp_bits_left[i] == 3'd0) sp_active[i] <= 1'b0;
                                 else sp_bits_left[i] <= sp_bits_left[i] - 1'b1;
@@ -158,13 +175,16 @@ module vga_peripheral (
 
                     for(i=0; i<8; i=i+1) begin
                         if (rect_active[i]) begin
-                            if (rect_x_count[i] > 0) begin
-                                rect_x_count[i] <= rect_x_count[i] - 1'b1;
-                            end else if (rect_w_count[i] > 0) begin
-                                rect_w_count[i] <= rect_w_count[i] - 1'b1;
-                            end else begin
-                                rect_active[i] <= 1'b0;
-                            end
+                            if (rect_x_count[i] > 0) rect_x_count[i] <= rect_x_count[i] - 1'b1;
+                            else if (rect_w_count[i] > 0) rect_w_count[i] <= rect_w_count[i] - 1'b1;
+                            else rect_active[i] <= 1'b0;
+                        end
+                    end
+
+                    for(i=0; i<2; i=i+1) begin
+                        if (line_active[i]) begin
+                            if (line_x_count[i] > 0) line_x_count[i] <= line_x_count[i] - 1'b1;
+                            else line_active[i] <= 1'b0; // Single pixel width
                         end
                     end
                 end
@@ -179,7 +199,8 @@ module vga_peripheral (
 
     always @* begin
         out_color = bg_color;
-
+        
+        // Rectangles (Back to Front)
         if (rect_active[7] && rect_x_count[7] == 0 && rect_w_count[7] > 0) out_color = rect_color[7];
         if (rect_active[6] && rect_x_count[6] == 0 && rect_w_count[6] > 0) out_color = rect_color[6];
         if (rect_active[5] && rect_x_count[5] == 0 && rect_w_count[5] > 0) out_color = rect_color[5];
@@ -188,7 +209,12 @@ module vga_peripheral (
         if (rect_active[2] && rect_x_count[2] == 0 && rect_w_count[2] > 0) out_color = rect_color[2];
         if (rect_active[1] && rect_x_count[1] == 0 && rect_w_count[1] > 0) out_color = rect_color[1];
         if (rect_active[0] && rect_x_count[0] == 0 && rect_w_count[0] > 0) out_color = rect_color[0];
+        
+        // Lines
+        if (line_active[1] && line_x_count[1] == 0) out_color = line_color[1];
+        if (line_active[0] && line_x_count[0] == 0) out_color = line_color[0];
 
+        // Sprites (Front-most)
         if (sp_active[5] && sp_x_count[5] == 0 && sp_shift[5][7]) out_color = sp_color[5];
         if (sp_active[4] && sp_x_count[4] == 0 && sp_shift[4][7]) out_color = sp_color[4];
         if (sp_active[3] && sp_x_count[3] == 0 && sp_shift[3][7]) out_color = sp_color[3];
@@ -210,5 +236,4 @@ module vga_peripheral (
         vsync,
         out_color[0], out_color[2], out_color[4]
     };
-
 endmodule
