@@ -43,7 +43,7 @@ module vga_peripheral (
     // -----------------------------------------------------
     reg [31:0] mem_w0 [0:15];
     reg [31:0] mem_w1 [0:15];
-    reg [31:0] mem_w2 [0:5];  
+    reg [31:0] mem_w2 [0:5];
 
     always @(posedge clk) begin
         // obj_index is 4 bits, so it naturally limits to 0-15
@@ -81,7 +81,7 @@ module vga_peripheral (
     wire [2:0] dy = logical_next_vpos[2:0] - mem_w0[scan_idx][7:5];
     reg  [7:0] extracted_row;
 
-    always @* begin
+    always @(*) begin
         case(dy)
             3'd0: extracted_row = mem_w1[scan_idx][31:24];
             3'd1: extracted_row = mem_w1[scan_idx][23:16];
@@ -146,7 +146,7 @@ module vga_peripheral (
 
                         line_active[scan_idx - 14] <= 1'b1;
                         line_color[scan_idx - 14]  <= mem_w1[scan_idx][12:7];
-                        
+
                         // Calculate X offset based on slope direction
                         if (mem_w1[scan_idx][21] == 1'b0) // Right (\)
                             line_x_count[scan_idx - 14] <= mem_w0[scan_idx][24:15] + (logical_next_vpos - mem_w0[scan_idx][14:5]);
@@ -197,9 +197,9 @@ module vga_peripheral (
     // -----------------------------------------------------
     reg [5:0] out_color;
 
-    always @* begin
+    always @(*) begin
         out_color = bg_color;
-        
+
         // Rectangles (Back to Front)
         if (rect_active[7] && rect_x_count[7] == 0 && rect_w_count[7] > 0) out_color = rect_color[7];
         if (rect_active[6] && rect_x_count[6] == 0 && rect_w_count[6] > 0) out_color = rect_color[6];
@@ -209,7 +209,7 @@ module vga_peripheral (
         if (rect_active[2] && rect_x_count[2] == 0 && rect_w_count[2] > 0) out_color = rect_color[2];
         if (rect_active[1] && rect_x_count[1] == 0 && rect_w_count[1] > 0) out_color = rect_color[1];
         if (rect_active[0] && rect_x_count[0] == 0 && rect_w_count[0] > 0) out_color = rect_color[0];
-        
+
         // Lines
         if (line_active[1] && line_x_count[1] == 0) out_color = line_color[1];
         if (line_active[0] && line_x_count[0] == 0) out_color = line_color[0];
@@ -226,14 +226,13 @@ module vga_peripheral (
     end
 
     always @(negedge vsync or negedge rst_n) begin
-        if (!rst_n) frames_counter <= 8'd0;
-        else        frames_counter <= frames_counter + 8'd1;
+        if (!rst_n) begin
+            frames_counter <= 8'd0;
+        end else begin
+            frames_counter <= frames_counter + 8'd1;
+        end
     end
 
-    assign vga_out = {
-        hsync,
-        out_color[1], out_color[3], out_color[5],
-        vsync,
-        out_color[0], out_color[2], out_color[4]
-    };
+    assign vga_out = { hsync, out_color[1], out_color[3], out_color[5], vsync, out_color[0], out_color[2], out_color[4] };
+
 endmodule
