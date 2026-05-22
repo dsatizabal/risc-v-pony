@@ -57,8 +57,8 @@ module vga_peripheral (
     reg [2:0]  sp_bits_left [0:3];
     reg [5:0]  sp_color     [0:3];
 
-    // NEW: Scaling state registers (Only 20 bits total!)
-    reg [1:0]  sp_scale       [0:3];
+    // INDEPENDENT X-SCALING REGISTERS
+    reg [1:0]  sp_scale_x     [0:3];
     reg [2:0]  sp_scale_count [0:3];
 
     reg        rect_active  [0:3];
@@ -79,10 +79,10 @@ module vga_peripheral (
     wire [9:0] next_vpos = (vpos == 524) ? 10'd0 : (vpos + 10'd1);
     wire [9:0] logical_next_vpos = {1'b0, next_vpos[9:1]};
 
-    // NEW: Dynamic Y-Axis Scaling Math (Pure Combinational)
-    wire [1:0] current_scale = mem_w0[scan_idx][1:0];
+    // INDEPENDENT Y-AXIS SCALING MATH (Reads Bits 3:2)
+    wire [1:0] current_scale_y = mem_w0[scan_idx][3:2];
     wire [9:0] dy_full = logical_next_vpos - mem_w0[scan_idx][14:5];
-    wire [2:0] scaled_dy = dy_full >> current_scale;
+    wire [2:0] scaled_dy = dy_full >> current_scale_y;
 
     reg  [7:0] extracted_row;
 
@@ -120,17 +120,19 @@ module vga_peripheral (
             else if (is_scanning) begin
                 // --- Sprites (0 to 3) ---
                 if (scan_idx < 4) begin
-                    // NEW: Calculate scaled height bound
+                    // Height boundary check uses Y-Scale (Bits 3:2)
                     if (mem_w0[scan_idx][31] &&
                        (logical_next_vpos >= mem_w0[scan_idx][14:5]) &&
-                       (logical_next_vpos <  mem_w0[scan_idx][14:5] + (10'd8 << mem_w0[scan_idx][1:0]))) begin
+                       (logical_next_vpos <  mem_w0[scan_idx][14:5] + (10'd8 << mem_w0[scan_idx][3:2]))) begin
 
                         sp_active[scan_idx]      <= 1'b1;
                         sp_x_count[scan_idx]     <= mem_w0[scan_idx][24:15];
                         sp_color[scan_idx]       <= mem_w0[scan_idx][30:25];
                         sp_bits_left[scan_idx]   <= 3'd7;
                         sp_shift[scan_idx]       <= extracted_row;
-                        sp_scale[scan_idx]       <= mem_w0[scan_idx][1:0];
+
+                        // Latch X-Scale (Bits 1:0) for the active render phase
+                        sp_scale_x[scan_idx]     <= mem_w0[scan_idx][1:0];
                         sp_scale_count[scan_idx] <= 3'd0;
                     end
                 end
@@ -174,8 +176,8 @@ module vga_peripheral (
                             if (sp_x_count[i] > 0) begin
                                 sp_x_count[i] <= sp_x_count[i] - 1'b1;
                             end else begin
-                                // NEW: Dynamic X-Axis Scaling Math
-                                if (sp_scale_count[i] < ((3'd1 << sp_scale[i]) - 1'b1)) begin
+                                // X-Axis Scaling Math uses latched sp_scale_x
+                                if (sp_scale_count[i] < ((3'd1 << sp_scale_x[i]) - 1'b1)) begin
                                     sp_scale_count[i] <= sp_scale_count[i] + 1'b1;
                                 end else begin
                                     sp_scale_count[i] <= 3'd0;
