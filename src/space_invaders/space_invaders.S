@@ -1,6 +1,6 @@
-# invaders_auto.S
-# Compile: riscv64-unknown-elf-gcc -march=rv32e -mabi=ilp32e -nostdlib -T link.ld -o invaders_auto.elf invaders_auto.S
-# Extract: riscv64-unknown-elf-objcopy -O binary invaders_auto.elf invaders_auto.bin
+# space_invaders.S
+# Compile: riscv64-unknown-elf-gcc -march=rv32e -mabi=ilp32e -nostdlib -T link.ld -o space_invaders.elf space_invaders.S
+# Extract: riscv64-unknown-elf-objcopy -O binary space_invaders.elf space_invaders.bin
 
 .equ MMIO_VGA_CTRL,        140
 .equ MMIO_VGA_OBJ_INDEX,   148
@@ -15,254 +15,525 @@
 .globl _start
 
 _start:
+
     # --------------------------------------------------------
-    # 1. SETUP STATIC BACKGROUND & PATTERNS
+    # 1. SETUP STATIC BACKGROUND & GROUND
     # --------------------------------------------------------
-    li x1, MMIO_VGA_BG_COLOR; li x2, 0x00; sw x2, 0(x1) # Black Sky
-    
+    LI x1, MMIO_VGA_BG_COLOR
+    LI x2, 0x00
+    SW x2, 0(x1)
+
     # Rect 7: Green Ground Line
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 7; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; li x2, 0x80001b80; sw x2, 0(x1) # Y=220
-    li x1, MMIO_VGA_OBJ_WORD1; li x3, 0x50028600; sw x3, 0(x1) # W=320, H=20, Green
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 7
+    SW x4, 0(x1)
 
-    # Sprite 4: Player Ship (White)
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 4; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD1; li x2, 0x18183C7E; sw x2, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD2; li x3, 0xFFFFFFFF; sw x3, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD0
+    LI x2, 0x80001B80
+    SW x2, 0(x1)
 
-    # Sprite 5: Bullet (Yellow Line)
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 5; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD1; li x2, 0x18181818; sw x2, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD2; li x3, 0x18181818; sw x3, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD1
+    LI x3, 0x50028600
+    SW x3, 0(x1)
 
-    li x1, MMIO_VGA_CTRL; li x2, 1; sw x2, 0(x1)
+    # Rect 4: The Bullet (Initialized as Width=2, Height=8, Yellow)
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 4
+    SW x4, 0(x1)
+
+    LI x1, MMIO_VGA_OBJ_WORD1
+    LI x2, 0x00811E00
+    SW x2, 0(x1)
+
+    LI x1, MMIO_VGA_CTRL
+    LI x2, 1
+    SW x2, 0(x1)
 
     # --------------------------------------------------------
-    # 2. STATE REGISTERS (Strict RV32E Limits)
+    # 2. STATE REGISTERS
     # --------------------------------------------------------
-    li x6, 160          # Player X
-    li x7, 0xFFFFF      # 20-bit ALIVE MASK (All 20 aliens alive)
-    li x8, 200          # Bullet Y
-    li x9, 0            # Score
-    li x10, 164         # Bullet X
-    li x11, 60          # Armada Base X
-    li x13, 0           # Global Frame Counter (32-bit continuous)
+    LI x6, 160          # Player X
+    LI x7, 0xFFFFF      # 20-bit ALIVE MASK (All 20 aliens alive)
+    LI x8, 200          # Bullet Y
+    LI x9, 0            # Score
+    LI x10, 164         # Bullet X
+    LI x11, 60          # Armada Base X
+    LI x13, 0           # Global Frame Counter
 
 game_loop:
-    # --- WAIT FOR VBLANK ---
-    li x1, MMIO_FRAMES_COUNTER
-    lw x2, 0(x1)
-wait_vblank:
-    lw x3, 0(x1)
-    beq x2, x3, wait_vblank
-    addi x13, x13, 1        # Increment continuous frame counter
 
     # --------------------------------------------------------
-    # 3. AUTONOMOUS PHYSICS & COLLISION
+    # 3. WAIT FOR VBLANK
     # --------------------------------------------------------
-    
-    # Player Auto-Sweep (Uses global frame counter sine-wave trick)
-    srli x4, x13, 2         # Divide frames by 4
-    andi x4, x4, 255        # Wrap at 255
-    li x5, 128; blt x4, x5, p_right
-    li x6, 256; sub x6, x6, x4; j p_done    # Moving Left
-p_right: li x6, 40; add x6, x6, x4          # Moving Right
+    LI x1, MMIO_FRAMES_COUNTER
+    LW x2, 0(x1)
+
+wait_vblank:
+
+    LW x3, 0(x1)
+    BEQ x2, x3, wait_vblank
+    ADDI x13, x13, 1
+
+    # --------------------------------------------------------
+    # 4. AUTONOMOUS PHYSICS & COLLISION
+    # --------------------------------------------------------
+
+    # Player Auto-Sweep
+    SRLI x4, x13, 2
+    ANDI x4, x4, 255
+    LI x5, 128
+    BLT x4, x5, p_right
+    LI x6, 256
+    SUB x6, x6, x4
+    J p_done
+p_right:
+    LI x6, 40
+    ADD x6, x6, x4
 p_done:
 
     # Armada Auto-Wobble
-    srli x4, x13, 4         # Divide frames by 16
-    andi x4, x4, 63         # Wrap at 63
-    li x5, 32; blt x4, x5, a_right
-    li x11, 100; sub x11, x11, x4; j a_done # Moving Left
-a_right: li x11, 40; add x11, x11, x4       # Moving Right
+    SRLI x4, x13, 4
+    ANDI x4, x4, 63
+    LI x5, 32
+    BLT x4, x5, a_right
+    LI x11, 100
+    SUB x11, x11, x4
+    J a_done
+a_right:
+    LI x11, 40
+    ADD x11, x11, x4
 a_done:
 
     # Bullet Movement
-    addi x8, x8, -4
-    li x4, 10; bge x8, x4, check_hit
+    ADDI x8, x8, -4
+    LI x4, 10
+    BGE x8, x4, check_hit
+
 reload_bullet:
-    li x8, 200              # Reload to Player Y
-    addi x10, x6, 4         # Center on Player X
-    j draw_fixed
+
+    LI x8, 200
+    ADDI x10, x6, 4
+    J draw_vblank_objects
 
 check_hit:
-    # --- EXACT COLLISION DETECTION ---
-    # 1. Check Y Bounds
-    addi x4, x8, -20        # Bullet Y - Armada Top
-    blt x4, zero, draw_fixed
-    li x5, 150
-    bge x4, x5, draw_fixed
+
+    # Check Y Bounds
+    ADDI x4, x8, -20
+    BLT x4, zero, draw_vblank_objects
+    LI x5, 150
+    BGE x4, x5, draw_vblank_objects
 
     # Find Row (0 to 4)
-    li x12, 0; li x5, 30
-row_loop: blt x4, x5, row_found; sub x4, x4, x5; addi x12, x12, 1; j row_loop
+    LI x12, 0
+    LI x5, 30
+row_loop:
+    BLT x4, x5, row_found
+    SUB x4, x4, x5
+    ADDI x12, x12, 1
+    J row_loop
 row_found:
-    li x5, 12; bge x4, x5, draw_fixed   # Hit the empty gap between rows!
+    LI x5, 12
+    BGE x4, x5, draw_vblank_objects
 
-    # 2. Check X Bounds
-    sub x4, x10, x11        # Bullet X - Armada Base X
-    addi x4, x4, 4          # Forgiveness width
-    blt x4, zero, draw_fixed
-    li x5, 160
-    bge x4, x5, draw_fixed
+    # Check X Bounds
+    SUB x4, x10, x11
+    ADDI x4, x4, 4
+    BLT x4, zero, draw_vblank_objects
+    LI x5, 160
+    BGE x4, x5, draw_vblank_objects
 
     # Find Col (0 to 3)
-    li x2, 0; li x5, 40
-col_loop: blt x4, x5, col_found; sub x4, x4, x5; addi x2, x2, 1; j col_loop
+    LI x2, 0
+    LI x5, 40
+col_loop:
+    BLT x4, x5, col_found
+    SUB x4, x4, x5
+    ADDI x2, x2, 1
+    J col_loop
 col_found:
-    li x5, 14; bge x4, x5, draw_fixed   # Hit the empty gap between columns!
+    LI x5, 14
+    BGE x4, x5, draw_vblank_objects
 
-    # 3. Check Alive Mask
-    slli x4, x12, 2         # Row * 4
-    add x4, x4, x2          # + Col (Bit Index)
-    li x5, 1; sll x5, x5, x4
-    and x2, x7, x5
-    beq x2, zero, draw_fixed # Bullet passed through a dead alien!
+    # Check Alive Mask
+    SLLI x4, x12, 2
+    ADD x4, x4, x2
+    LI x5, 1
+    SLL x5, x5, x4
+    AND x2, x7, x5
+    BEQ x2, zero, draw_vblank_objects
 
     # HIT! Kill Alien, Update Score, Reload Bullet
-    xor x7, x7, x5          # Flip the alive bit to 0!
-    addi x9, x9, 1          # Score++
-    li x4, 99; ble x9, x4, skip_cap; li x9, 0
+    XOR x7, x7, x5
+    ADDI x9, x9, 1
+    LI x4, 99
+    BLE x9, x4, skip_cap
+    LI x9, 0
 skip_cap:
-    beq x7, zero, respawn_armada
-    j reload_bullet
+    BEQ x7, zero, respawn_armada
+    J reload_bullet
 respawn_armada:
-    li x7, 0xFFFFF          # Revive all aliens!
-    j reload_bullet
+    LI x7, 0xFFFFF
+    J reload_bullet
 
+draw_vblank_objects:
 
-draw_fixed:
     # --------------------------------------------------------
-    # 4. DRAW FIXED OBJECTS & SCORE
+    # 5. DRAW VBLANK OBJECTS (Bullet & Score)
     # --------------------------------------------------------
-    # Player (Sprite 4)
-    li x5, 0xfe000000; slli x4, x6, 15; or x5, x5, x4; li x4, 210; slli x4, x4, 5; or x5, x5, x4
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 4; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; sw x5, 0(x1)
 
-    # Bullet (Sprite 5)
-    li x5, 0xfa000000; slli x4, x10, 15; or x5, x5, x4; slli x4, x8, 5; or x5, x5, x4
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 5; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; sw x5, 0(x1)
+    # Bullet (Rect 4)
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 4
+    SW x4, 0(x1)
+
+    LI x5, 0x80000000
+    SLLI x4, x10, 15
+    OR x5, x5, x4
+    SLLI x4, x8, 5
+    OR x5, x5, x4
+
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x5, 0(x1)
 
     # Score (Sprites 0 & 1)
-    mv x5, x9; li x4, 0; li x2, 10
-s_div: blt x5, x2, s_div_done; sub x5, x5, x2; addi x4, x4, 1; j s_div
+    MV x5, x9
+    LI x4, 0
+    LI x2, 10
+s_div:
+    BLT x5, x2, s_div_done
+    SUB x5, x5, x2
+    ADDI x4, x4, 1
+    J s_div
 s_div_done:
-    li x1, MMIO_VGA_OBJ_INDEX; li x2, 0; sw x2, 0(x1)
-    li x2, 0xf8000000; li x3, 10; slli x3, x3, 15; or x2, x2, x3; li x3, 10; slli x3, x3, 5; or x2, x2, x3
-    li x1, MMIO_VGA_OBJ_WORD0; sw x2, 0(x1)
-    jal x14, get_font; li x1, MMIO_VGA_OBJ_WORD1; sw x2, 0(x1); li x1, MMIO_VGA_OBJ_WORD2; sw x3, 0(x1)
-    
-    li x1, MMIO_VGA_OBJ_INDEX; li x2, 1; sw x2, 0(x1)
-    li x2, 0xf8000000; li x3, 18; slli x3, x3, 15; or x2, x2, x3; li x3, 10; slli x3, x3, 5; or x2, x2, x3
-    li x1, MMIO_VGA_OBJ_WORD0; sw x2, 0(x1)
-    mv x4, x5
-    jal x14, get_font; li x1, MMIO_VGA_OBJ_WORD1; sw x2, 0(x1); li x1, MMIO_VGA_OBJ_WORD2; sw x3, 0(x1)
+
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x2, 0
+    SW x2, 0(x1)
+    LI x2, 0xF8000000
+    LI x3, 10
+    SLLI x3, x3, 15
+    OR x2, x2, x3
+    LI x3, 10
+    SLLI x3, x3, 5
+    OR x2, x2, x3
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x2, 0(x1)
+    JAL x14, get_font
+    LI x1, MMIO_VGA_OBJ_WORD1
+    SW x2, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD2
+    SW x3, 0(x1)
+
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x2, 1
+    SW x2, 0(x1)
+    LI x2, 0xF8000000
+    LI x3, 18
+    SLLI x3, x3, 15
+    OR x2, x2, x3
+    LI x3, 10
+    SLLI x3, x3, 5
+    OR x2, x2, x3
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x2, 0(x1)
+    MV x4, x5
+    JAL x14, get_font
+    LI x1, MMIO_VGA_OBJ_WORD1
+    SW x2, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD2
+    SW x3, 0(x1)
 
     # --------------------------------------------------------
-    # 5. VERTICAL MULTIPLEXING (RACING THE BEAM)
+    # 6. RACING THE BEAM: THE ALIEN ARMADA
     # --------------------------------------------------------
-    li x3, MMIO_LINE_COUNTER
-wait_line_20: lw x4, 0(x3); li x5, 20; blt x4, x5, wait_line_20
+    LI x3, MMIO_LINE_COUNTER
+
+wait_line_0:
+
+    LW x4, 0(x3)
+    BNE x4, zero, wait_line_0
+
+wait_line_20:
+
+    LW x4, 0(x3)
+    LI x5, 20
+    BLT x4, x5, wait_line_20
 
     # Load Alien Graphic Pattern into Sprites 0,1,2,3
-    li x1, MMIO_VGA_OBJ_INDEX; li x2, MMIO_VGA_OBJ_WORD1; li x10, MMIO_VGA_OBJ_WORD2
-    li x4, 0x183C7EDB; li x5, 0xFF245AA5
-    li x14, 0; sw x14, 0(x1); sw x4, 0(x2); sw x5, 0(x10)
-    li x14, 1; sw x14, 0(x1); sw x4, 0(x2); sw x5, 0(x10)
-    li x14, 2; sw x14, 0(x1); sw x4, 0(x2); sw x5, 0(x10)
-    li x14, 3; sw x14, 0(x1); sw x4, 0(x2); sw x5, 0(x10)
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x2, MMIO_VGA_OBJ_WORD1
+    LI x10, MMIO_VGA_OBJ_WORD2
+    LI x4, 0x183C7EDB
+    LI x5, 0xFF245AA5
+
+    LI x14, 0
+    SW x14, 0(x1)
+    SW x4, 0(x2)
+    SW x5, 0(x10)
+    LI x14, 1
+    SW x14, 0(x1)
+    SW x4, 0(x2)
+    SW x5, 0(x10)
+    LI x14, 2
+    SW x14, 0(x1)
+    SW x4, 0(x2)
+    SW x5, 0(x10)
+    LI x14, 3
+    SW x14, 0(x1)
+    SW x4, 0(x2)
+    SW x5, 0(x10)
 
     # Draw the 5 Rows!
-    li x12, 0; li x15, 20;  jal x14, draw_alien_row
-wait_line_50: lw x4, 0(x3); li x5, 50; blt x4, x5, wait_line_50
-    li x12, 1; li x15, 50;  jal x14, draw_alien_row
-wait_line_80: lw x4, 0(x3); li x5, 80; blt x4, x5, wait_line_80
-    li x12, 2; li x15, 80;  jal x14, draw_alien_row
-wait_line_110: lw x4, 0(x3); li x5, 110; blt x4, x5, wait_line_110
-    li x12, 3; li x15, 110; jal x14, draw_alien_row
-wait_line_140: lw x4, 0(x3); li x5, 140; blt x4, x5, wait_line_140
-    li x12, 4; li x15, 140; jal x14, draw_alien_row
+    LI x12, 0
+    LI x15, 20
+    JAL x14, draw_alien_row
+wait_line_50:
+    LW x4, 0(x3)
+    LI x5, 50
+    BLT x4, x5, wait_line_50
+    LI x12, 1
+    LI x15, 50
+    JAL x14, draw_alien_row
+wait_line_80:
+    LW x4, 0(x3)
+    LI x5, 80
+    BLT x4, x5, wait_line_80
+    LI x12, 2
+    LI x15, 80
+    JAL x14, draw_alien_row
+wait_line_110:
+    LW x4, 0(x3)
+    LI x5, 110
+    BLT x4, x5, wait_line_110
+    LI x12, 3
+    LI x15, 110
+    JAL x14, draw_alien_row
+wait_line_140:
+    LW x4, 0(x3)
+    LI x5, 140
+    BLT x4, x5, wait_line_140
+    LI x12, 4
+    LI x15, 140
+    JAL x14, draw_alien_row
 
-    # Restore Bullet X from Player X for the next frame physics calculation
-    addi x10, x6, 4 
+    # --------------------------------------------------------
+    # 7. RACING THE BEAM: THE PLAYER SHIP
+    # --------------------------------------------------------
+wait_line_160:
 
-    j game_loop
+    LW x4, 0(x3)
+    LI x5, 160
+    BLT x4, x5, wait_line_160
+
+    # Draw Player (Sprite 0)
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 0
+    SW x4, 0(x1)
+
+    LI x5, 0xFE000000
+    SLLI x4, x6, 15
+    OR x5, x5, x4
+    LI x4, 210
+    SLLI x4, x4, 5
+    OR x5, x5, x4
+
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x5, 0(x1)
+
+    LI x1, MMIO_VGA_OBJ_WORD1
+    LI x5, 0x18183C7E
+    SW x5, 0(x1)
+
+    LI x1, MMIO_VGA_OBJ_WORD2
+    LI x5, 0xFFFFFFFF
+    SW x5, 0(x1)
+
+    # Hide Sprites 1, 2, 3 so they don't drag aliens to the bottom
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x2, MMIO_VGA_OBJ_WORD0
+
+    LI x4, 1
+    SW x4, 0(x1)
+    SW zero, 0(x2)
+    LI x4, 2
+    SW x4, 0(x1)
+    SW zero, 0(x2)
+    LI x4, 3
+    SW x4, 0(x1)
+    SW zero, 0(x2)
+
+    # Restore Bullet X from Player X for the next loop
+    ADDI x10, x6, 4
+
+    J game_loop
 
 # --------------------------------------------------------
-# SUBROUTINE: Draw 4 Aliens (Masked by Alive Mask & Intro Sequence)
-# Inputs: x12 = Row Index, x15 = Target Y
+# SUBROUTINE: Draw 4 Aliens
 # --------------------------------------------------------
 draw_alien_row:
-    # 1. The Line-by-Line Appearance Sequence
-    srli x4, x13, 5         # Reveal 1 row every 32 frames (~0.5 sec)
-    li x5, 5; blt x4, x5, check_vis; li x4, 5
+
+    SRLI x4, x13, 5
+    LI x5, 5
+    BLT x4, x5, check_vis
+    LI x4, 5
+
 check_vis:
-    bge x12, x4, skip_draw  # Skip drawing if row isn't visible yet
 
-    # 2. Extract the 4 alive bits for this specific row
-    slli x4, x12, 2         # Row * 4
-    srl x5, x7, x4          # Shift alive mask so this row is at the bottom
+    BGE x12, x4, skip_draw
 
-    # Draw Sprite 0 (Col 0)
-    andi x4, x5, 1; slli x4, x4, 31         # If alive, x4 = 0x80000000 (Enable=1)
-    li x2, 0x0c000000; or x2, x2, x4        # Base: Color Green
-    slli x4, x15, 5; or x2, x2, x4          # Pack Y
-    slli x4, x11, 15; or x2, x2, x4         # Pack X
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 0; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; sw x2, 0(x1)
+    SLLI x4, x12, 2
+    SRL x5, x7, x4
 
-    # Draw Sprite 1 (Col 1)
-    srli x5, x5, 1
-    andi x4, x5, 1; slli x4, x4, 31
-    li x2, 0x0c000000; or x2, x2, x4
-    slli x4, x15, 5; or x2, x2, x4
-    addi x4, x11, 40; slli x4, x4, 15; or x2, x2, x4
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 1; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; sw x2, 0(x1)
+    # Draw Sprite 0
+    ANDI x4, x5, 1
+    SLLI x4, x4, 31
+    LI x2, 0x0C000000
+    OR x2, x2, x4
+    SLLI x4, x15, 5
+    OR x2, x2, x4
+    SLLI x4, x11, 15
+    OR x2, x2, x4
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 0
+    SW x4, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x2, 0(x1)
 
-    # Draw Sprite 2 (Col 2)
-    srli x5, x5, 1
-    andi x4, x5, 1; slli x4, x4, 31
-    li x2, 0x0c000000; or x2, x2, x4
-    slli x4, x15, 5; or x2, x2, x4
-    addi x4, x11, 80; slli x4, x4, 15; or x2, x2, x4
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 2; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; sw x2, 0(x1)
+    # Draw Sprite 1
+    SRLI x5, x5, 1
+    ANDI x4, x5, 1
+    SLLI x4, x4, 31
+    LI x2, 0x0C000000
+    OR x2, x2, x4
+    SLLI x4, x15, 5
+    OR x2, x2, x4
+    ADDI x4, x11, 40
+    SLLI x4, x4, 15
+    OR x2, x2, x4
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 1
+    SW x4, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x2, 0(x1)
 
-    # Draw Sprite 3 (Col 3)
-    srli x5, x5, 1
-    andi x4, x5, 1; slli x4, x4, 31
-    li x2, 0x0c000000; or x2, x2, x4
-    slli x4, x15, 5; or x2, x2, x4
-    addi x4, x11, 120; slli x4, x4, 15; or x2, x2, x4
-    li x1, MMIO_VGA_OBJ_INDEX; li x4, 3; sw x4, 0(x1)
-    li x1, MMIO_VGA_OBJ_WORD0; sw x2, 0(x1)
+    # Draw Sprite 2
+    SRLI x5, x5, 1
+    ANDI x4, x5, 1
+    SLLI x4, x4, 31
+    LI x2, 0x0C000000
+    OR x2, x2, x4
+    SLLI x4, x15, 5
+    OR x2, x2, x4
+    ADDI x4, x11, 80
+    SLLI x4, x4, 15
+    OR x2, x2, x4
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 2
+    SW x4, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x2, 0(x1)
+
+    # Draw Sprite 3
+    SRLI x5, x5, 1
+    ANDI x4, x5, 1
+    SLLI x4, x4, 31
+    LI x2, 0x0C000000
+    OR x2, x2, x4
+    SLLI x4, x15, 5
+    OR x2, x2, x4
+    ADDI x4, x11, 120
+    SLLI x4, x4, 15
+    OR x2, x2, x4
+    LI x1, MMIO_VGA_OBJ_INDEX
+    LI x4, 3
+    SW x4, 0(x1)
+    LI x1, MMIO_VGA_OBJ_WORD0
+    SW x2, 0(x1)
 
 skip_draw:
-    jalr zero, 0(x14)
+
+    JALR zero, 0(x14)
 
 # --------------------------------------------------------
 # FONT SUBROUTINE (0-9)
 # --------------------------------------------------------
 get_font:
-    li x15, 1; beq x4, x15, f_1
-    li x15, 2; beq x4, x15, f_2
-    li x15, 3; beq x4, x15, f_3
-    li x15, 4; beq x4, x15, f_4
-    li x15, 5; beq x4, x15, f_5
-    li x15, 6; beq x4, x15, f_6
-    li x15, 7; beq x4, x15, f_7
-    li x15, 8; beq x4, x15, f_8
-    li x15, 9; beq x4, x15, f_9
-f_0: li x2, 0x3C666666; li x3, 0x6666663C; jalr zero, 0(x14)
-f_1: li x2, 0x18381818; li x3, 0x1818187E; jalr zero, 0(x14)
-f_2: li x2, 0x3C66060C; li x3, 0x1830607E; jalr zero, 0(x14)
-f_3: li x2, 0x3C66061C; li x3, 0x0606663C; jalr zero, 0(x14)
-f_4: li x2, 0x0C1C3C6C; li x3, 0xCCFE0C0C; jalr zero, 0(x14)
-f_5: li x2, 0x7E607C06; li x3, 0x0606663C; jalr zero, 0(x14)
-f_6: li x2, 0x3C66607C; li x3, 0x6666663C; jalr zero, 0(x14)
-f_7: li x2, 0x7E06060C; li x3, 0x18181818; jalr zero, 0(x14)
-f_8: li x2, 0x3C66663C; li x3, 0x6666663C; jalr zero, 0(x14)
-f_9: li x2, 0x3C666666; li x3, 0x3E06063C; jalr zero, 0(x14)
+
+    LI x15, 1
+    BEQ x4, x15, f_1
+    LI x15, 2
+    BEQ x4, x15, f_2
+    LI x15, 3
+    BEQ x4, x15, f_3
+    LI x15, 4
+    BEQ x4, x15, f_4
+    LI x15, 5
+    BEQ x4, x15, f_5
+    LI x15, 6
+    BEQ x4, x15, f_6
+    LI x15, 7
+    BEQ x4, x15, f_7
+    LI x15, 8
+    BEQ x4, x15, f_8
+    LI x15, 9
+    BEQ x4, x15, f_9
+
+f_0:
+
+    LI x2, 0x3C666666
+    LI x3, 0x6666663C
+    JALR zero, 0(x14)
+
+f_1:
+
+    LI x2, 0x18381818
+    LI x3, 0x1818187E
+    JALR zero, 0(x14)
+
+f_2:
+
+    LI x2, 0x3C66060C
+    LI x3, 0x1830607E
+    JALR zero, 0(x14)
+
+f_3:
+
+    LI x2, 0x3C66061C
+    LI x3, 0x0606663C
+    JALR zero, 0(x14)
+
+f_4:
+
+    LI x2, 0x0C1C3C6C
+    LI x3, 0xCCFE0C0C
+    JALR zero, 0(x14)
+
+f_5:
+
+    LI x2, 0x7E607C06
+    LI x3, 0x0606663C
+    JALR zero, 0(x14)
+
+f_6:
+
+    LI x2, 0x3C66607C
+    LI x3, 0x6666663C
+    JALR zero, 0(x14)
+
+f_7:
+
+    LI x2, 0x7E06060C
+    LI x3, 0x18181818
+    JALR zero, 0(x14)
+
+f_8:
+
+    LI x2, 0x3C66663C
+    LI x3, 0x6666663C
+    JALR zero, 0(x14)
+
+f_9:
+
+    LI x2, 0x3C666666
+    LI x3, 0x3E06063C
+    JALR zero, 0(x14)
