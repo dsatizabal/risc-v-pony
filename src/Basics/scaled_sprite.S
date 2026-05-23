@@ -34,11 +34,11 @@ _start:
     # Color = Bright Green 0x0C (Shift left 25) -> 0x18000000
     # X = 128 (Shift left 15) -> 0x00400000
     # Y = 88 (Shift left 5)  -> 0x00000B00
-    # Scale = 8x (Set bits 1:0 to binary 11) -> 0x00000003
-    # Combined: 0x98400B03
+    # Scale = 8x (Set bits 3:0 to binary 1111) -> 0x0000000F
+    # Combined: 0x98400B0F
     # --------------------------------------------------------
     LI x1, MMIO_VGA_OBJ_WORD0
-    LI x2, 0x98400B03
+    LI x2, 0x98400B0F
     SW x2, 0(x1)
 
     # --------------------------------------------------------
