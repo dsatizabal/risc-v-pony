@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1778618663" />
-    <testcase name="test_interactive_menu" classname="test_interactive" file="/mnt/c/repos/risc-v-pony/test/test_interactive.py" lineno="21" time="8.637678623199463" sim_time_ns="90040.001" ratio_time="10424.097136256789" />
-  </testsuite>
-</testsuites>

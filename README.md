@@ -25,6 +25,43 @@ There's a whole lot of CocoTB tests to be run, some run C/Assembly code, check t
 
 For FPGA testing see the FPGA bringup document [here](./docs/fpga_bringup.MD)
 
+## Built-in peripherals
+
+A VGA driver and Gamepad interface was added to support the TinyTapeout PMODs, the peripheral were added to the core to maintain simplicity in the interface, this might be interpreted as a mixture of processing blocks with peripheral yes, but just to avoid the complexity of moving logic into the project.v file or somewhere else it was decided to go simmple and treat those peripherals as part of the code.
+
+### The VGA peripheral
+
+The VGA peripheral can drive all 8 pins of the output port, it uses the [H Sync Generator](./src/h_sync_generator.v) widely used for Demoscene projects.
+
+By default the Output port is driven by a fake memory location of the CPU: 128h. A new register was created, the 140h, by default it gets 00h on reset and indicates that the Output ports is driven by the value written to the RAM address 128h.
+
+When a value different to 00h is written to the RAM address 140h the output port becomes driven by the VGA Peripheral and thus that port can drive a VGA PMOD.
+
+WIP: Video interface
+
+### The Gamepad interface
+
+The Gamepad interface gets constantly the signals from the input port, we don't have an activation for this. So the gamepad is always outputting key press information.
+
+To read the Gamepad state a new read RAM address was added, the 144h, a read to that memory location returns 32 bits according to the following:
+
+- Bits 31 to 13: read as zero
+- IsPresent: Is present flag
+- SELECT
+- START
+- LEFT
+- RIGHT
+- DOWN
+- UP
+- L
+- R
+- Y
+- X
+- B
+- A
+
+TODO: Change to 2 controls support
+
 ## What is Tiny Tapeout?
 
 Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
